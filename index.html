@@ -151,9 +151,15 @@ Particle.prototype.update = function () {
 };
 
 Particle.prototype.draw = function () {
+  /* halo suave */
+  ctx.beginPath();
+  ctx.arc(this.x, this.y, this.r * 3.5, 0, 6.2832);
+  ctx.fillStyle = `hsla(${this.hue},100%,${this.lit}%,${this.alpha * 0.12})`;
+  ctx.fill();
+  /* núcleo */
   ctx.beginPath();
   ctx.arc(this.x, this.y, this.r, 0, 6.2832);
-  ctx.fillStyle = `hsla(${this.hue},82%,${this.lit}%,${this.alpha})`;
+  ctx.fillStyle = `hsla(${this.hue},100%,${this.lit + 10}%,${this.alpha})`;
   ctx.fill();
 };
 
@@ -224,14 +230,17 @@ function frame() {
   ctx.drawImage(vid, 0, 0, W, H);
   ctx.restore();
 
-  /* overlay oscuro suave para que las partículas resalten */
-  ctx.fillStyle = 'rgba(0,0,10,0.35)';
+  /* overlay oscuro mínimo para que las partículas resalten */
+  ctx.fillStyle = 'rgba(0,0,10,0.22)';
   ctx.fillRect(0, 0, W, H);
 
+  /* mezcla aditiva: partículas emiten luz sobre cualquier fondo */
+  ctx.globalCompositeOperation = 'lighter';
   for (let i = 0; i < particles.length; i++) {
     particles[i].update();
     particles[i].draw();
   }
+  ctx.globalCompositeOperation = 'source-over';
 
   /* glow en puntos clave de cada mano */
   if (landmarks) {
