@@ -6,42 +6,52 @@
   <title>PromoUPSA 2026</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; }
+    body { background: #000; overflow: hidden; font-family: Arial, sans-serif; }
     canvas { display: block; }
     video  { display: none; }
 
-    #tip {
+    #bar {
       position: fixed;
-      bottom: 22px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: rgba(255,255,255,0.35);
-      font: 12px/1 'Arial', sans-serif;
-      letter-spacing: 2.5px;
+      bottom: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 10px 12px 14px;
+      background: linear-gradient(transparent, rgba(0,0,0,0.8));
+      z-index: 10;
+    }
+    .btn {
+      cursor: pointer;
+      padding: 5px 13px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 20px;
+      color: rgba(255,255,255,0.4);
+      font-size: 11px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
-      white-space: nowrap;
-      pointer-events: none;
+      background: rgba(255,255,255,0.04);
+      transition: all .18s;
+      user-select: none;
+    }
+    .btn:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.1); }
+    .btn.active {
+      color: #fff;
+      border-color: rgba(255,255,255,0.65);
+      background: rgba(255,255,255,0.14);
+      box-shadow: 0 0 14px rgba(255,255,255,0.18);
     }
 
-    #overlay {
-      position: fixed;
-      inset: 0;
+    #ov {
+      position: fixed; inset: 0;
       background: #000;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 14px;
-      z-index: 9;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 14px; z-index: 20;
       transition: opacity .7s;
     }
-    #overlay.gone { opacity: 0; pointer-events: none; }
-    #overlay span {
-      color: rgba(255,255,255,0.4);
-      font: 13px/1 'Arial', sans-serif;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-    }
+    #ov.gone { opacity: 0; pointer-events: none; }
+    #ov span { color: rgba(255,255,255,0.4); font-size: 13px; letter-spacing: 3px; text-transform: uppercase; }
     .ring {
       width: 32px; height: 32px;
       border: 2px solid rgba(80,180,255,.15);
@@ -54,12 +64,11 @@
 </head>
 <body>
 
-<div id="overlay"><div class="ring"></div><span>Cargando</span></div>
+<div id="ov"><div class="ring"></div><span>Cargando</span></div>
 <canvas id="c"></canvas>
 <video  id="v" autoplay playsinline muted></video>
-<div    id="tip">Iniciando…</div>
+<div    id="bar"></div>
 
-<!-- CDNs exactos -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
         crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
@@ -68,251 +77,652 @@
 <script>
 'use strict';
 
-/* ── elementos ─────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   SETUP
+═══════════════════════════════════════════════════════════════ */
 const c   = document.getElementById('c');
 const ctx = c.getContext('2d');
 const vid = document.getElementById('v');
-const tip = document.getElementById('tip');
-const ov  = document.getElementById('overlay');
+const bar = document.getElementById('bar');
+const ov  = document.getElementById('ov');
 
-/* ── dimensiones ───────────────────────────────── */
-let W = 0, H = 0;
+let W = c.width  = window.innerWidth;
+let H = c.height = window.innerHeight;
+let T = 0; // frame counter
 
-/* ── estado global ─────────────────────────────── */
-const N          = 3000;
-const TEXT_SHARE = 0.75;   // fracción de partículas ancladas al texto
+let landmarks = null; // [{x,y,z,sx,sy}, ...]
 
-let pts       = [];        // array plano [x0,y0, x1,y1, ...]
-let landmarks = null;      // [{x,y,z} …] normalizados 0-1, ya espejeados
+// hand bone connections (MediaPipe topology)
+const CONN = [
+  [0,1],[1,2],[2,3],[3,4],
+  [0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],
+  [0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],
+  [5,9],[9,13],[13,17]
+];
 
-/* ── clase Particle ────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   MODES
+═══════════════════════════════════════════════════════════════ */
+const MODE_LIST = [
+  { id:'particles', label:'① Particles' },
+  { id:'garden',    label:'② Garden'    },
+  { id:'skeleton',  label:'③ Skeleton'  },
+  { id:'mirror',    label:'④ Mirror'    },
+  { id:'fire',      label:'⑤ Fire'      },
+  { id:'matrix',    label:'⑥ Matrix'    },
+  { id:'binary',    label:'⑦ Binary'    },
+];
+let mode = 'particles';
+
+/* ═══════════════════════════════════════════════════════════════
+   SHARED WATERMARK
+═══════════════════════════════════════════════════════════════ */
+function drawWatermark(alpha) {
+  const a = alpha || 0.08;
+  const cx = W/2, cy = H/2;
+  const fs1 = Math.min(W/8.5, 115);
+  const fs2 = Math.min(W/5.5, 175);
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowBlur = 40;
+  ctx.shadowColor = `rgba(120,200,255,${a*3})`;
+  ctx.fillStyle   = `rgba(200,230,255,${a})`;
+  ctx.font = `900 ${fs1}px Arial`;
+  ctx.fillText('PromoUPSA', cx, cy - fs1*0.82);
+  ctx.font = `900 ${fs2}px Arial`;
+  ctx.fillText('2026', cx, cy + fs2*0.52);
+  ctx.restore();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODE 1 — PARTICLES
+   3000 partículas forman "PromoUPSA 2026", huyen de la mano
+═══════════════════════════════════════════════════════════════ */
+const PCOUNT = 3000;
+let particles = [];
+
 function Particle(hx, hy, isText) {
-  this.hx = hx;  this.hy = hy;
+  this.hx = hx; this.hy = hy;
   this.x  = Math.random() * W;
   this.y  = Math.random() * H;
-  this.vx = 0;   this.vy = 0;
-
+  this.vx = 0; this.vy = 0;
   if (isText) {
-    this.r       = 1.1 + Math.random() * 2;
-    this.alpha   = 0.75 + Math.random() * 0.25;
-    this.baseHue = Math.random() < 0.55
-                   ? 200 + Math.random() * 50   /* azul → cian */
-                   :  38 + Math.random() * 18;  /* dorado */
-    this.spring  = 0.052;
-    this.rR      = 145;
-    this.rStr    = 11;
+    this.r      = 1.2 + Math.random() * 2.2;
+    this.alpha  = 0.8 + Math.random() * 0.2;
+    this.baseH  = Math.random() < 0.55 ? 200 + Math.random()*50 : 38 + Math.random()*18;
+    this.spring = 0.055;
+    this.rR = 145; this.rStr = 11;
   } else {
-    this.r       = 0.3 + Math.random() * 1;
-    this.alpha   = 0.04 + Math.random() * 0.16;
-    this.baseHue = 195 + Math.random() * 65;
-    this.spring  = 0.006;
-    this.rR      = 70;
-    this.rStr    = 3;
+    this.r      = 0.3 + Math.random() * 1;
+    this.alpha  = 0.04 + Math.random() * 0.14;
+    this.baseH  = 195 + Math.random() * 65;
+    this.spring = 0.006;
+    this.rR = 70; this.rStr = 3;
   }
-
-  this.hue = this.baseHue;
+  this.h = this.baseH;
   this.lit = 65;
 }
 
-Particle.prototype.update = function () {
-  /* spring hacia home */
+Particle.prototype.update = function() {
   this.vx += (this.hx - this.x) * this.spring;
   this.vy += (this.hy - this.y) * this.spring;
-
-  /* repulsión de la mano */
-  let maxPush = 0;
+  let push = 0;
   if (landmarks) {
-    const R = this.rR, S = this.rStr;
     for (let i = 0; i < landmarks.length; i++) {
       const lm = landmarks[i];
-      const dx = this.x - lm.sx;   /* sx/sy ya están en píxeles */
-      const dy = this.y - lm.sy;
-      const d2 = dx * dx + dy * dy;
-      if (d2 < R * R && d2 > 0.01) {
-        const d = Math.sqrt(d2);
-        const f = (R - d) / R;
-        this.vx += (dx / d) * f * S;
-        this.vy += (dy / d) * f * S;
-        if (f > maxPush) maxPush = f;
+      const dx = this.x - lm.sx, dy = this.y - lm.sy;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < this.rR*this.rR && d2 > 0.01) {
+        const d = Math.sqrt(d2), f = (this.rR-d)/this.rR;
+        this.vx += (dx/d)*f*this.rStr;
+        this.vy += (dy/d)*f*this.rStr;
+        if (f > push) push = f;
       }
     }
   }
-
-  /* cambio de color según perturbación */
-  const tH = maxPush > 0 ? this.baseHue - maxPush * 160 : this.baseHue;
-  const tL = maxPush > 0 ? 65 + maxPush * 35             : 65;
-  this.hue += (tH - this.hue) * 0.1;
+  const tH = push > 0 ? this.baseH - push*160 : this.baseH;
+  const tL = push > 0 ? 65 + push*35           : 65;
+  this.h   += (tH - this.h)   * 0.1;
   this.lit += (tL - this.lit) * 0.1;
-
-  this.vx *= 0.86;
-  this.vy *= 0.86;
-  this.x  += this.vx;
-  this.y  += this.vy;
+  this.vx *= 0.86; this.vy *= 0.86;
+  this.x  += this.vx; this.y  += this.vy;
 };
 
-Particle.prototype.draw = function () {
-  /* halo suave */
+Particle.prototype.draw = function() {
   ctx.beginPath();
-  ctx.arc(this.x, this.y, this.r * 3.5, 0, 6.2832);
-  ctx.fillStyle = `hsla(${this.hue},100%,${this.lit}%,${this.alpha * 0.12})`;
+  ctx.arc(this.x, this.y, this.r*3.5, 0, 6.2832);
+  ctx.fillStyle = `hsla(${this.h},100%,${this.lit}%,${this.alpha*0.13})`;
   ctx.fill();
-  /* núcleo */
   ctx.beginPath();
   ctx.arc(this.x, this.y, this.r, 0, 6.2832);
-  ctx.fillStyle = `hsla(${this.hue},100%,${this.lit + 10}%,${this.alpha})`;
+  ctx.fillStyle = `hsla(${this.h},100%,${this.lit+10}%,${this.alpha})`;
   ctx.fill();
 };
 
-/* ── muestreo de texto ─────────────────────────── */
 function sampleText() {
-  const off   = document.createElement('canvas');
-  off.width   = W;  off.height = H;
-  const o     = off.getContext('2d');
-  const cx    = W / 2, cy = H / 2;
-  const fs1   = Math.min(W / 8.5,  115);
-  const fs2   = Math.min(W / 5.5,  175);
-
-  o.textAlign    = 'center';
-  o.textBaseline = 'middle';
-  o.fillStyle    = '#fff';
-  o.font         = `900 ${fs1}px Arial`;
-  o.fillText('PromoUPSA', cx, cy - fs1 * 0.82);
-  o.font         = `900 ${fs2}px Arial`;
-  o.fillText('2026', cx, cy + fs2 * 0.52);
-
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const o   = off.getContext('2d');
+  const cx  = W/2, cy = H/2;
+  const fs1 = Math.min(W/8.5, 115);
+  const fs2 = Math.min(W/5.5, 175);
+  o.textAlign = 'center'; o.textBaseline = 'middle'; o.fillStyle = '#fff';
+  o.font = `900 ${fs1}px Arial`; o.fillText('PromoUPSA', cx, cy - fs1*0.82);
+  o.font = `900 ${fs2}px Arial`; o.fillText('2026',      cx, cy + fs2*0.52);
   const px   = o.getImageData(0, 0, W, H).data;
-  const step = Math.max(3, Math.floor(Math.sqrt((W * H) / 45000)));
+  const step = Math.max(3, Math.floor(Math.sqrt(W*H/45000)));
   const out  = [];
-
   for (let y = 0; y < H; y += step)
     for (let x = 0; x < W; x += step)
-      if (px[(y * W + x) * 4 + 3] > 128)
-        out.push(x, y);
-
-  /* Fisher-Yates sobre pares */
-  for (let i = out.length / 2 - 1; i > 0; i--) {
-    const j  = (Math.random() * (i + 1)) | 0;
+      if (px[(y*W+x)*4+3] > 128) out.push(x, y);
+  for (let i = out.length/2-1; i > 0; i--) {
+    const j = (Math.random()*(i+1))|0;
     const tx = out[i*2], ty = out[i*2+1];
-    out[i*2] = out[j*2];  out[i*2+1] = out[j*2+1];
-    out[j*2] = tx;         out[j*2+1] = ty;
+    out[i*2] = out[j*2]; out[i*2+1] = out[j*2+1];
+    out[j*2] = tx;       out[j*2+1] = ty;
   }
   return out;
 }
 
-/* ── inicialización ────────────────────────────── */
-function init() {
-  W = c.width  = window.innerWidth;
-  H = c.height = window.innerHeight;
-
-  pts = sampleText();
-  const textN = Math.min((N * TEXT_SHARE) | 0, pts.length / 2);
-  const arr   = new Array(N);
-
-  for (let i = 0; i < N; i++) {
-    arr[i] = i < textN
-      ? new Particle(pts[i * 2], pts[i * 2 + 1], true)
-      : new Particle(Math.random() * W, Math.random() * H, false);
-  }
-  return arr;
+function initParticles() {
+  const pts   = sampleText();
+  const textN = Math.min((PCOUNT*0.75)|0, pts.length/2);
+  particles   = new Array(PCOUNT);
+  for (let i = 0; i < PCOUNT; i++)
+    particles[i] = i < textN
+      ? new Particle(pts[i*2], pts[i*2+1], true)
+      : new Particle(Math.random()*W, Math.random()*H, false);
 }
 
-let particles = init();
-window.addEventListener('resize', () => { particles = init(); });
-
-/* ── bucle de render ───────────────────────────── */
-const KEY = [0, 4, 8, 12, 16, 20]; // muñeca + puntas de dedos
-
-function frame() {
-  /* cámara en tiempo real como fondo (espejada igual que los landmarks) */
-  ctx.save();
-  ctx.scale(-1, 1);
-  ctx.translate(-W, 0);
-  ctx.drawImage(vid, 0, 0, W, H);
-  ctx.restore();
-
-  /* overlay oscuro mínimo para que las partículas resalten */
-  ctx.fillStyle = 'rgba(0,0,10,0.22)';
-  ctx.fillRect(0, 0, W, H);
-
-  /* mezcla aditiva: partículas emiten luz sobre cualquier fondo */
+function renderParticles() {
+  drawWatermark(0.11);
   ctx.globalCompositeOperation = 'lighter';
   for (let i = 0; i < particles.length; i++) {
     particles[i].update();
     particles[i].draw();
   }
   ctx.globalCompositeOperation = 'source-over';
+}
 
-  /* glow en puntos clave de cada mano */
-  if (landmarks) {
-    const handsN = landmarks.length / 21;
-    for (let h = 0; h < handsN; h++) {
-      for (let k = 0; k < KEY.length; k++) {
-        const lm = landmarks[h * 21 + KEY[k]];
-        if (!lm) continue;
-        const g = ctx.createRadialGradient(lm.sx, lm.sy, 0, lm.sx, lm.sy, 24);
-        g.addColorStop(0, 'rgba(120,205,255,0.3)');
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.beginPath();
-        ctx.arc(lm.sx, lm.sy, 24, 0, 6.2832);
-        ctx.fillStyle = g;
-        ctx.fill();
-      }
+/* ═══════════════════════════════════════════════════════════════
+   MODE 2 — GARDEN
+   Fractales / flores crecen desde las puntas de los dedos
+═══════════════════════════════════════════════════════════════ */
+function branch(x, y, angle, len, depth, hue) {
+  if (depth <= 0 || len < 2) return;
+  const ex = x + Math.cos(angle)*len;
+  const ey = y + Math.sin(angle)*len;
+  const glitch = Math.random() < 0.04;
+
+  if (glitch) {
+    ctx.beginPath(); ctx.moveTo(x+4,y); ctx.lineTo(ex+4,ey);
+    ctx.strokeStyle = 'rgba(255,0,80,0.4)';
+    ctx.lineWidth = depth*0.6; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x-4,y); ctx.lineTo(ex-4,ey);
+    ctx.strokeStyle = 'rgba(0,180,255,0.4)';
+    ctx.stroke();
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(x, y); ctx.lineTo(ex, ey);
+  ctx.strokeStyle = `hsla(${hue + depth*18 + Math.sin(T*0.02)*25},90%,62%,${depth/5*0.95})`;
+  ctx.lineWidth   = depth * 0.75;
+  ctx.lineCap     = 'round';
+  ctx.stroke();
+
+  if (depth === 1) {
+    for (let p = 0; p < 6; p++) {
+      const pa = p/6*Math.PI*2;
+      const r  = 4 + Math.sin(T*0.06)*1.5;
+      ctx.beginPath();
+      ctx.arc(ex + Math.cos(pa)*r, ey + Math.sin(pa)*r, 2.5, 0, 6.2832);
+      ctx.fillStyle = `hsla(${hue+70},100%,80%,0.9)`;
+      ctx.fill();
     }
+    ctx.beginPath();
+    ctx.arc(ex, ey, 3, 0, 6.2832);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.fill();
+  }
+
+  const spread = 0.42 + Math.sin(T*0.025)*0.08;
+  branch(ex, ey, angle - spread,      len*0.65, depth-1, hue);
+  branch(ex, ey, angle + spread*0.88, len*0.65, depth-1, hue);
+}
+
+function renderGarden() {
+  ctx.globalCompositeOperation = 'lighter';
+  if (landmarks) {
+    const handsN = Math.floor(landmarks.length/21);
+    const tips = [4,8,12,16,20];
+    const mids = [3,7,11,15,19];
+    for (let h = 0; h < handsN; h++) {
+      tips.forEach((ti, fi) => {
+        const tip = landmarks[h*21+ti];
+        const mid = landmarks[h*21+mids[fi]];
+        const ang = Math.atan2(tip.sy-mid.sy, tip.sx-mid.sx) - Math.PI/2;
+        branch(tip.sx, tip.sy, ang, 48, 5, 80 + fi*28);
+      });
+    }
+  } else {
+    // idle: árbol desde el centro inferior
+    branch(W/2, H*0.72, -Math.PI/2, 75, 6, 100 + Math.sin(T*0.015)*30);
+  }
+  ctx.globalCompositeOperation = 'source-over';
+  drawWatermark();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODE 3 — SKELETON
+   Esqueleto neon muy detallado con glow pulsante
+═══════════════════════════════════════════════════════════════ */
+function renderSkeleton() {
+  if (!landmarks) { drawWatermark(); return; }
+  ctx.globalCompositeOperation = 'lighter';
+  const handsN = Math.floor(landmarks.length/21);
+
+  for (let h = 0; h < handsN; h++) {
+    const lms = landmarks.slice(h*21, (h+1)*21);
+
+    // bones
+    CONN.forEach(([a, b]) => {
+      const p1 = lms[a], p2 = lms[b];
+      ctx.lineCap = 'round';
+      // outer aura
+      ctx.beginPath(); ctx.moveTo(p1.sx,p1.sy); ctx.lineTo(p2.sx,p2.sy);
+      ctx.strokeStyle = 'rgba(0,255,255,0.07)';
+      ctx.lineWidth = 18; ctx.stroke();
+      // mid glow
+      ctx.strokeStyle = 'rgba(0,220,255,0.22)';
+      ctx.lineWidth = 7; ctx.stroke();
+      // bright core
+      ctx.strokeStyle = 'rgba(200,255,255,0.95)';
+      ctx.lineWidth = 1.8; ctx.stroke();
+    });
+
+    // joints
+    lms.forEach((lm, i) => {
+      const isTip  = [4,8,12,16,20].includes(i);
+      const isBase = [1,5,9,13,17].includes(i);
+      const r      = isTip ? 8 : isBase ? 5.5 : 4;
+      const pulse  = 1 + Math.sin(T*0.08 + i*0.35)*0.25;
+
+      const g = ctx.createRadialGradient(lm.sx,lm.sy,0, lm.sx,lm.sy,r*3.5*pulse);
+      g.addColorStop(0, isTip ? 'rgba(0,255,200,0.75)' : 'rgba(0,200,255,0.55)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.arc(lm.sx, lm.sy, r*3.5*pulse, 0, 6.2832);
+      ctx.fillStyle = g;
+      ctx.fill();
+
+      // bright dot
+      ctx.beginPath();
+      ctx.arc(lm.sx, lm.sy, isTip ? 2.5 : 1.8, 0, 6.2832);
+      ctx.fillStyle = 'white';
+      ctx.fill();
+    });
+  }
+
+  ctx.globalCompositeOperation = 'source-over';
+  drawWatermark();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODE 4 — MIRROR
+   Simetría 4-vías de la mano
+═══════════════════════════════════════════════════════════════ */
+function renderMirror() {
+  if (!landmarks) { drawWatermark(); return; }
+  ctx.globalCompositeOperation = 'lighter';
+
+  const handsN = Math.floor(landmarks.length/21);
+  // 4 reflections: original, flip-X, flip-Y, flip-both
+  const ref = [[1,1],[-1,1],[1,-1],[-1,-1]];
+
+  ref.forEach(([rx, ry], ri) => {
+    const hue = ri*90 + T*0.25;
+    for (let h = 0; h < handsN; h++) {
+      const lms = landmarks.slice(h*21, (h+1)*21).map(lm => ({
+        sx: rx === 1 ? lm.sx : W - lm.sx,
+        sy: ry === 1 ? lm.sy : H - lm.sy,
+      }));
+
+      CONN.forEach(([a, b]) => {
+        const p1 = lms[a], p2 = lms[b];
+        ctx.beginPath(); ctx.moveTo(p1.sx,p1.sy); ctx.lineTo(p2.sx,p2.sy);
+        ctx.strokeStyle = `hsla(${hue},90%,65%,0.35)`;
+        ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.stroke();
+        ctx.strokeStyle = `hsla(${hue},100%,88%,0.55)`;
+        ctx.lineWidth = 0.8; ctx.stroke();
+      });
+
+      lms.forEach((lm, i) => {
+        const r = [4,8,12,16,20].includes(i) ? 5 : 3;
+        const g = ctx.createRadialGradient(lm.sx,lm.sy,0,lm.sx,lm.sy,r*3);
+        g.addColorStop(0, `hsla(${hue},100%,70%,0.6)`);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.arc(lm.sx,lm.sy,r*3,0,6.2832);
+        ctx.fillStyle = g; ctx.fill();
+      });
+    }
+  });
+
+  ctx.globalCompositeOperation = 'source-over';
+  drawWatermark();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODE 5 — FIRE
+   Fuego naranja/rojo sale de las puntas de los dedos
+═══════════════════════════════════════════════════════════════ */
+let fp = [];
+
+function FP(x, y) {
+  this.x = x + (Math.random()-0.5)*10;
+  this.y = y;
+  this.vx = (Math.random()-0.5)*3.5;
+  this.vy = -(Math.random()*5.5 + 2.5);
+  this.life = 1;
+  this.decay = 0.016 + Math.random()*0.024;
+  this.r = Math.random()*5 + 2;
+}
+FP.prototype.update = function() {
+  this.vx += (Math.random()-0.5)*0.55;
+  this.vy -= 0.07;
+  this.x  += this.vx;
+  this.y  += this.vy;
+  this.life -= this.decay;
+};
+FP.prototype.draw = function() {
+  const age = 1 - this.life;
+  const hue = age<0.25 ? 58 : age<0.55 ? 28 : age<0.8 ? 10 : 0;
+  const lit = age<0.25 ? 96 : age<0.55 ? 72 : age<0.8 ? 52 : 30;
+  const sz  = this.r * this.life;
+  const g   = ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,sz*3.5);
+  g.addColorStop(0, `hsla(${hue},100%,${lit+8}%,${this.life*0.45})`);
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.arc(this.x,this.y,sz*3.5,0,6.2832);
+  ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); ctx.arc(this.x,this.y,sz,0,6.2832);
+  ctx.fillStyle = `hsla(${hue},100%,${lit}%,${this.life*0.9})`;
+  ctx.fill();
+};
+
+function renderFire() {
+  ctx.globalCompositeOperation = 'lighter';
+  if (landmarks) {
+    const handsN = Math.floor(landmarks.length/21);
+    for (let h = 0; h < handsN; h++) {
+      [4,8,12,16,20].forEach(ti => {
+        const lm = landmarks[h*21+ti];
+        for (let j = 0; j < 9; j++) fp.push(new FP(lm.sx, lm.sy));
+      });
+    }
+  }
+  fp = fp.filter(p => { p.update(); if(p.life>0){p.draw();return true;} return false; });
+  ctx.globalCompositeOperation = 'source-over';
+  drawWatermark();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODE 6 — MATRIX
+   Lluvia de caracteres ASCII, la mano los perturba
+═══════════════════════════════════════════════════════════════ */
+const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&<>{}[]/\\ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵカキクケコ'.split('');
+const COL_W  = 18;
+let mcols    = [];
+
+function initMatrix() {
+  const n = Math.ceil(W/COL_W);
+  mcols = Array.from({length: n}, () => ({
+    y:     -Math.random()*H,
+    speed: 1.5 + Math.random()*2,
+    len:   (18 + Math.random()*18)|0,
+    trail: [],
+  }));
+  mcols.forEach(col => {
+    col.trail = Array.from({length: col.len}, () => CHARS[Math.random()*CHARS.length|0]);
+  });
+}
+
+function renderMatrix() {
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.font = `${COL_W-2}px monospace`;
+
+  mcols.forEach((col, ci) => {
+    const x = ci*COL_W + 2;
+    let nearHand = false;
+    if (landmarks) {
+      for (let i = 0; i < landmarks.length; i++)
+        if (Math.abs(landmarks[i].sx - x) < 60) { nearHand = true; break; }
+    }
+
+    col.speed = nearHand ? 6 + Math.random()*4 : 1.5 + Math.random();
+    if (nearHand && Math.random() < 0.35)
+      col.trail[Math.random()*col.trail.length|0] = CHARS[Math.random()*CHARS.length|0];
+
+    col.trail.forEach((ch, i) => {
+      const py = col.y - i*COL_W;
+      if (py < -COL_W || py > H+COL_W) return;
+      const fade   = Math.max(0, 1 - i/col.len);
+      const isHead = i === 0;
+      if (nearHand) {
+        ctx.fillStyle = isHead
+          ? 'rgba(255,200,80,1)'
+          : `rgba(255,${(120+fade*80)|0},0,${fade*0.8})`;
+      } else {
+        ctx.fillStyle = isHead
+          ? 'rgba(180,255,180,1)'
+          : `rgba(0,${(180*fade+40)|0},0,${fade*0.85})`;
+      }
+      ctx.fillText(ch, x, py);
+    });
+
+    col.y += col.speed;
+    if (col.y > H + col.len*COL_W) {
+      col.y = -col.len*COL_W;
+      col.trail = Array.from({length: col.len}, () => CHARS[Math.random()*CHARS.length|0]);
+    }
+    if (Math.random() < 0.04)
+      col.trail[Math.random()*col.trail.length|0] = CHARS[Math.random()*CHARS.length|0];
+  });
+
+  drawWatermark();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MODE 7 — BINARY
+   Objetos se llenan con 1s y 0s estilo máquina de escribir
+═══════════════════════════════════════════════════════════════ */
+const CELL = 20;
+let bcells = [];
+let boff   = null;
+let boctx  = null;
+
+function initBinary() {
+  const cols = Math.ceil(W/CELL), rows = Math.ceil(H/CELL);
+  bcells = Array.from({length: rows}, (_, r) =>
+    Array.from({length: cols}, (_, c) => ({
+      x: c*CELL, y: r*CELL, ch: '0', a: 0, ta: 0, tick: (Math.random()*20)|0
+    }))
+  );
+  boff  = document.createElement('canvas');
+  boff.width  = cols;
+  boff.height = rows;
+  boctx = boff.getContext('2d');
+}
+
+function renderBinary() {
+  // sample camera at grid resolution
+  boctx.save();
+  boctx.scale(-1, 1);
+  boctx.translate(-boff.width, 0);
+  boctx.drawImage(vid, 0, 0, boff.width, boff.height);
+  boctx.restore();
+  const px = boctx.getImageData(0, 0, boff.width, boff.height).data;
+
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.font = `bold ${CELL-3}px monospace`;
+
+  bcells.forEach((row, ri) => {
+    row.forEach((cell, ci) => {
+      const idx    = (ri*row.length + ci)*4;
+      const bright = (px[idx]+px[idx+1]+px[idx+2]) / 765;
+      let near = false;
+      if (landmarks) {
+        for (let i = 0; i < landmarks.length; i++)
+          if (Math.abs(landmarks[i].sx-cell.x)<CELL*3.5 &&
+              Math.abs(landmarks[i].sy-cell.y)<CELL*3.5) { near=true; break; }
+      }
+      cell.ta  = near ? 1 : bright > 0.28 ? bright*0.88 : 0;
+      cell.a  += (cell.ta - cell.a) * 0.07;
+      if (cell.a < 0.04) return;
+      cell.tick++;
+      if (cell.tick % 10 === 0) cell.ch = Math.random() < 0.5 ? '1' : '0';
+      ctx.fillStyle = near
+        ? `rgba(255,140,0,${cell.a})`
+        : `rgba(0,${(200+bright*55)|0},0,${cell.a})`;
+      ctx.fillText(cell.ch, cell.x+1, cell.y+CELL-3);
+    });
+  });
+
+  drawWatermark();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAIN LOOP
+═══════════════════════════════════════════════════════════════ */
+const KEY_LM = [0,4,8,12,16,20];
+
+function frame() {
+  T++;
+
+  // camera background (mirrored)
+  ctx.save();
+  ctx.scale(-1,1); ctx.translate(-W,0);
+  ctx.drawImage(vid, 0, 0, W, H);
+  ctx.restore();
+
+  // subtle dark overlay
+  ctx.fillStyle = 'rgba(0,0,10,0.22)';
+  ctx.fillRect(0, 0, W, H);
+
+  // active mode
+  switch(mode) {
+    case 'particles': renderParticles(); break;
+    case 'garden':    renderGarden();    break;
+    case 'skeleton':  renderSkeleton();  break;
+    case 'mirror':    renderMirror();    break;
+    case 'fire':      renderFire();      break;
+    case 'matrix':    renderMatrix();    break;
+    case 'binary':    renderBinary();    break;
+  }
+
+  // fingertip glow (todos los modos excepto skeleton que ya lo hace)
+  if (landmarks && mode !== 'skeleton') {
+    ctx.globalCompositeOperation = 'lighter';
+    const handsN = Math.floor(landmarks.length/21);
+    for (let h = 0; h < handsN; h++) {
+      KEY_LM.forEach(ki => {
+        const lm = landmarks[h*21+ki];
+        if (!lm) return;
+        const g = ctx.createRadialGradient(lm.sx,lm.sy,0,lm.sx,lm.sy,22);
+        g.addColorStop(0,'rgba(120,205,255,0.28)');
+        g.addColorStop(1,'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.arc(lm.sx,lm.sy,22,0,6.2832);
+        ctx.fillStyle = g; ctx.fill();
+      });
+    }
+    ctx.globalCompositeOperation = 'source-over';
   }
 
   requestAnimationFrame(frame);
 }
-frame();
 
-/* ── MediaPipe Hands ───────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════
+   RESIZE
+═══════════════════════════════════════════════════════════════ */
+function onResize() {
+  W = c.width  = window.innerWidth;
+  H = c.height = window.innerHeight;
+  initParticles();
+  initMatrix();
+  initBinary();
+}
+window.addEventListener('resize', onResize);
+
+/* ═══════════════════════════════════════════════════════════════
+   MEDIAPIPE
+═══════════════════════════════════════════════════════════════ */
 function buildHands() {
   const mp = new Hands({
     locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
   });
-
   mp.setOptions({
-    maxNumHands: 2,
-    modelComplexity: 1,
-    minDetectionConfidence: 0.6,
-    minTrackingConfidence: 0.5
+    maxNumHands: 2, modelComplexity: 1,
+    minDetectionConfidence: 0.6, minTrackingConfidence: 0.5
   });
-
   mp.onResults(r => {
-    if (r.multiHandLandmarks && r.multiHandLandmarks.length) {
-      /* aplanar todas las manos y precalcular coordenadas en píxeles */
-      landmarks = r.multiHandLandmarks.flat().map(lm => ({
-        x: lm.x, y: lm.y, z: lm.z,
-        sx: (1 - lm.x) * W,  /* espejo (vista selfie) */
-        sy: lm.y * H
-      }));
-      tip.textContent = '✋  mano detectada — movela para interactuar';
-    } else {
-      landmarks = null;
-      tip.textContent = 'Acercá tu mano a la cámara';
-    }
+    landmarks = r.multiHandLandmarks?.length
+      ? r.multiHandLandmarks.flat().map(lm => ({
+          ...lm,
+          sx: (1-lm.x)*W,
+          sy: lm.y*H
+        }))
+      : null;
   });
-
   return mp;
 }
 
-/* ── cámara ────────────────────────────────────── */
 async function startCam(mp) {
   try {
     const cam = new Camera(vid, {
-      onFrame: async () => mp.send({ image: vid }),
-      width: 640,
-      height: 480
+      onFrame: async () => mp.send({image: vid}),
+      width: 640, height: 480
     });
     await cam.start();
-    tip.textContent = 'Acercá tu mano a la cámara';
-  } catch (err) {
-    tip.textContent = 'Sin cámara — partículas activas';
-    console.warn('Camera:', err.message);
+  } catch(e) {
+    console.warn('Camera:', e.message);
   }
   ov.classList.add('gone');
   setTimeout(() => ov.remove(), 750);
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   UI — BOTONES + TECLADO
+═══════════════════════════════════════════════════════════════ */
+function setMode(id) {
+  mode = id;
+  document.querySelectorAll('.btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.id === id)
+  );
+}
+
+MODE_LIST.forEach(({id, label}) => {
+  const btn = document.createElement('div');
+  btn.className  = 'btn' + (id === mode ? ' active' : '');
+  btn.dataset.id = id;
+  btn.textContent = label;
+  btn.onclick    = () => setMode(id);
+  bar.appendChild(btn);
+});
+
+window.addEventListener('keydown', e => {
+  const i = parseInt(e.key) - 1;
+  if (i >= 0 && i < MODE_LIST.length) setMode(MODE_LIST[i].id);
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════════════ */
+initParticles();
+initMatrix();
+initBinary();
+frame();
 startCam(buildHands());
 </script>
 </body>
