@@ -94,7 +94,7 @@ function Particle(hx, hy, isText) {
 
   if (isText) {
     this.r       = 1.1 + Math.random() * 2;
-    this.alpha   = 0.55 + Math.random() * 0.45;
+    this.alpha   = 0.75 + Math.random() * 0.25;
     this.baseHue = Math.random() < 0.55
                    ? 200 + Math.random() * 50   /* azul → cian */
                    :  38 + Math.random() * 18;  /* dorado */
@@ -214,12 +214,18 @@ let particles = init();
 window.addEventListener('resize', () => { particles = init(); });
 
 /* ── bucle de render ───────────────────────────── */
-/* índices de landmarks clave: muñeca + puntas de dedos */
-const KEY = [0, 4, 8, 12, 16, 20];
+const KEY = [0, 4, 8, 12, 16, 20]; // muñeca + puntas de dedos
 
 function frame() {
-  /* trail effect */
-  ctx.fillStyle = 'rgba(0,0,8,0.17)';
+  /* cámara en tiempo real como fondo (espejada igual que los landmarks) */
+  ctx.save();
+  ctx.scale(-1, 1);
+  ctx.translate(-W, 0);
+  ctx.drawImage(vid, 0, 0, W, H);
+  ctx.restore();
+
+  /* overlay oscuro suave para que las partículas resalten */
+  ctx.fillStyle = 'rgba(0,0,10,0.35)';
   ctx.fillRect(0, 0, W, H);
 
   for (let i = 0; i < particles.length; i++) {
