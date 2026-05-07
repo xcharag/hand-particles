@@ -42,6 +42,26 @@
       box-shadow: 0 0 14px rgba(255,255,255,0.18);
     }
 
+    #subbar {
+      position: fixed;
+      bottom: 52px; left: 0; right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      padding: 4px 12px;
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .28s;
+    }
+    #subbar.show { opacity: 1; pointer-events: all; }
+    .fbtn.active {
+      color: #fff;
+      border-color: rgba(255,210,80,0.75) !important;
+      background: rgba(255,210,80,0.1) !important;
+      box-shadow: 0 0 14px rgba(255,210,80,0.25) !important;
+    }
+
     #ov {
       position: fixed; inset: 0;
       background: #000;
@@ -67,6 +87,7 @@
 <div id="ov"><div class="ring"></div><span>Cargando</span></div>
 <canvas id="c"></canvas>
 <video  id="v" autoplay playsinline muted></video>
+<div    id="subbar"></div>
 <div    id="bar"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
@@ -289,81 +310,154 @@ function drawPetal(cx, cy, angle, len, width, hue, alpha) {
   ctx.stroke();
 }
 
-/* Dibuja la flor completa en (cx,cy) con apertura open∈[0,1] y escala scale */
-function drawFlower(cx, cy, open, scale) {
-  /* ── capa exterior: 6 pétalos, se abren escalonados ── */
-  const N1 = 6;
-  for (let p = 0; p < N1; p++) {
-    const start   = (p / N1) * 0.28;            // cada pétalo empieza en distinto momento
-    const stagger = open <= start ? 0 : Math.min(1, (open - start) / (1 - start));
-    if (stagger < 0.01) continue;
+/* Tipos de flor */
+const FLOWER_DEFS = [
+  { label:'Q · Orquídea' },
+  { label:'W · Gerbera'  },
+  { label:'E · Tajibo 🇧🇴'},
+  { label:'R · Jardín'   },
+];
+let flowerIdx = 0;
 
-    const ang   = (p/N1)*Math.PI*2 - Math.PI/2 + T*0.004;
-    const len   = scale*(0.07 + stagger*1.15);
-    const wid   = scale*(0.02 + stagger*0.33);
-    const hue   = 270 + p*14 + open*55;         // violeta → rosa → blanco
-    const alpha = 0.18 + stagger*0.75;
-    drawPetal(cx, cy, ang, len, wid, hue, alpha);
-  }
-
-  /* ── capa interior: 6 pétalos dorados, abren más tarde ── */
-  const N2 = 6;
-  for (let p = 0; p < N2; p++) {
-    const start   = 0.2 + (p/N2)*0.22;
-    const stagger = open <= start ? 0 : Math.min(1, (open - start) / (1 - start));
-    if (stagger < 0.01) continue;
-
-    const ang   = (p/N2)*Math.PI*2 - Math.PI/2 + Math.PI/N2 + T*0.007;
-    const len   = scale*(0.03 + stagger*0.68);
-    const wid   = scale*(0.012 + stagger*0.17);
-    const hue   = 38 + p*9 + T*0.35;
-    const alpha = 0.22 + stagger*0.68;
-    drawPetal(cx, cy, ang, len, wid, hue, alpha);
-  }
-
-  /* ── estambre central ── */
-  const cr = scale*(0.04 + open*0.09);
-  const g  = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr*2.8);
+/* Núcleo compartido: estambre, capullo y destellos */
+function flowerCore(cx, cy, open, scale, budHue, sparkHue) {
+  const cr = scale*(0.04+open*0.09);
+  const g  = ctx.createRadialGradient(cx,cy,0,cx,cy,cr*2.8);
   g.addColorStop(0,   `hsla(55,100%,98%,${0.65+open*0.35})`);
   g.addColorStop(0.4, `hsla(44,100%,78%,${0.45+open*0.45})`);
   g.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.beginPath(); ctx.arc(cx, cy, cr*2.8, 0, 6.2832);
-  ctx.fillStyle = g; ctx.fill();
+  ctx.beginPath(); ctx.arc(cx,cy,cr*2.8,0,6.2832); ctx.fillStyle=g; ctx.fill();
 
-  /* ── capullo (visible cuando cerrado) ── */
   if (open < 0.32) {
-    const bt = 1 - open/0.32;
+    const bt=1-open/0.32;
     ctx.beginPath();
-    ctx.ellipse(cx, cy - scale*0.09*bt, scale*0.1*bt, scale*0.22*bt, 0, 0, 6.2832);
-    ctx.fillStyle   = `hsla(130,70%,28%,${0.55*bt})`;
-    ctx.strokeStyle = `hsla(145,80%,52%,${0.7*bt})`;
-    ctx.lineWidth   = 1.2; ctx.fill(); ctx.stroke();
-    // sépalos
-    for (let s = 0; s < 3; s++) {
-      const sa = s/3*Math.PI*2 - Math.PI/2 + 0.3;
+    ctx.ellipse(cx,cy-scale*0.09*bt,scale*0.1*bt,scale*0.22*bt,0,0,6.2832);
+    ctx.fillStyle=`hsla(${budHue},70%,28%,${0.55*bt})`;
+    ctx.strokeStyle=`hsla(${budHue+15},80%,52%,${0.7*bt})`;
+    ctx.lineWidth=1.2; ctx.fill(); ctx.stroke();
+    for (let s=0;s<3;s++) {
+      const sa=s/3*Math.PI*2-Math.PI/2+0.3;
       ctx.beginPath();
-      ctx.moveTo(cx, cy + scale*0.05*bt);
+      ctx.moveTo(cx,cy+scale*0.05*bt);
       ctx.quadraticCurveTo(
-        cx + Math.cos(sa)*scale*0.14*bt, cy + Math.sin(sa)*scale*0.14*bt,
-        cx + Math.cos(sa)*scale*0.06*bt, cy + Math.sin(sa)*scale*0.06*bt - scale*0.12*bt
+        cx+Math.cos(sa)*scale*0.14*bt,cy+Math.sin(sa)*scale*0.14*bt,
+        cx+Math.cos(sa)*scale*0.06*bt,cy+Math.sin(sa)*scale*0.06*bt-scale*0.12*bt
       );
-      ctx.strokeStyle = `hsla(130,80%,45%,${0.55*bt})`;
-      ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.strokeStyle=`hsla(${budHue},80%,45%,${0.55*bt})`; ctx.lineWidth=1.5; ctx.stroke();
     }
   }
-
-  /* ── destellos cuando plena floración ── */
   if (open > 0.85) {
-    const sparkA = (open - 0.85) / 0.15;
-    for (let s = 0; s < 14; s++) {
-      const sa = s/14*Math.PI*2 + T*0.014;
-      const sr = scale*(0.78 + Math.sin(T*0.055 + s)*0.18);
-      ctx.beginPath();
-      ctx.arc(cx + Math.cos(sa)*sr, cy + Math.sin(sa)*sr, 1.8, 0, 6.2832);
-      ctx.fillStyle = `hsla(55,100%,92%,${sparkA*0.88})`;
-      ctx.fill();
+    const a=(open-0.85)/0.15;
+    for (let s=0;s<14;s++) {
+      const sa=s/14*Math.PI*2+T*0.014;
+      const sr=scale*(0.78+Math.sin(T*0.055+s)*0.18);
+      ctx.beginPath(); ctx.arc(cx+Math.cos(sa)*sr,cy+Math.sin(sa)*sr,1.8,0,6.2832);
+      ctx.fillStyle=`hsla(${sparkHue},100%,90%,${a*0.88})`; ctx.fill();
     }
   }
+}
+
+/* ── ORQUÍDEA: magenta, blanco, púrpura ── */
+function drawOrchid(cx, cy, open, scale) {
+  // sépalo dorsal (arriba)
+  const s0=Math.min(1,open/0.7);
+  if (s0>0.01) drawPetal(cx,cy,-Math.PI/2,scale*(0.06+s0*0.88),scale*(0.013+s0*0.17),290,0.15+s0*0.75);
+  // 2 pétalos ala (más grandes, los más laterales)
+  const wings=[[-Math.PI/2+1.1],[-Math.PI/2-1.1]];
+  wings.forEach(([ang],i)=>{
+    const s=Math.max(0,Math.min(1,(open-0.08)*1.25));
+    if (s<0.01) return;
+    drawPetal(cx,cy,ang,scale*(0.05+s*1.05),scale*(0.025+s*0.42),i?295:308,0.12+s*0.78);
+  });
+  // 2 sépalos laterales inferiores (estrechos)
+  [Math.PI/2+0.52,Math.PI/2-0.52].forEach(ang=>{
+    const s=Math.max(0,Math.min(1,(open-0.05)*1.2));
+    if (s<0.01) return;
+    drawPetal(cx,cy,ang,scale*(0.04+s*0.65),scale*(0.007+s*0.09),280,0.1+s*0.52);
+  });
+  // labellum (labio — más ancho, blanco con magenta)
+  const sl=Math.max(0,Math.min(1,(open-0.15)*1.2));
+  if (sl>0.01) {
+    drawPetal(cx,cy,Math.PI/2,scale*(0.05+sl*0.9),scale*(0.032+sl*0.44),318,0.15+sl*0.68);
+    drawPetal(cx,cy,Math.PI/2,scale*(0.03+sl*0.55),scale*(0.018+sl*0.26),350,0.18+sl*0.72);
+  }
+  flowerCore(cx,cy,open,scale,130,310);
+}
+
+/* ── GERBERA: naranja, amarillo, rojo ── */
+function drawGerbera(cx, cy, open, scale) {
+  // anillo exterior: 20 pétalos finos
+  for (let p=0;p<20;p++) {
+    const st=(p/20)*0.15, s=open<=st?0:Math.min(1,(open-st)/(1-st));
+    if (s<0.01) continue;
+    drawPetal(cx,cy,(p/20)*Math.PI*2+T*0.002,scale*(0.06+s*0.98),scale*(0.007+s*0.088),18+p*3,0.2+s*0.72);
+  }
+  // anillo interior: 12 pétalos amarillos
+  for (let p=0;p<12;p++) {
+    const st=0.13+(p/12)*0.13, s=open<=st?0:Math.min(1,(open-st)/(1-st));
+    if (s<0.01) continue;
+    drawPetal(cx,cy,(p/12)*Math.PI*2+Math.PI/12+T*0.003,scale*(0.04+s*0.58),scale*(0.006+s*0.068),42+p*4,0.25+s*0.65);
+  }
+  // disco central oscuro
+  if (open>0.05) {
+    const dr=scale*(0.07+open*0.1);
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,dr);
+    g.addColorStop(0,`rgba(55,12,0,${0.55+open*0.4})`);
+    g.addColorStop(0.7,`rgba(95,28,0,${0.4+open*0.35})`);
+    g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(cx,cy,dr,0,6.2832); ctx.fillStyle=g; ctx.fill();
+  }
+  flowerCore(cx,cy,open,scale,25,40);
+}
+
+/* ── TAJIBO: amarillo intenso, dorado (flor nacional de Bolivia) ── */
+function drawTajibo(cx, cy, open, scale) {
+  for (let p=0;p<5;p++) {
+    const st=(p/5)*0.2, s=open<=st?0:Math.min(1,(open-st)/(1-st));
+    if (s<0.01) continue;
+    const ang=(p/5)*Math.PI*2-Math.PI/2+T*0.005;
+    const len=scale*(0.07+s*1.08), wid=scale*(0.03+s*0.44);
+    const hue=44+p*3+Math.sin(T*0.03+p)*4;
+    const tx=cx+Math.cos(ang)*len, ty=cy+Math.sin(ang)*len;
+    const perp=ang+Math.PI/2, m=0.52;
+    const cp1x=cx+Math.cos(ang)*len*m+Math.cos(perp)*wid, cp1y=cy+Math.sin(ang)*len*m+Math.sin(perp)*wid;
+    const cp2x=cx+Math.cos(ang)*len*m-Math.cos(perp)*wid, cp2y=cy+Math.sin(ang)*len*m-Math.sin(perp)*wid;
+    ctx.beginPath(); ctx.moveTo(cx,cy);
+    ctx.bezierCurveTo(cp1x,cp1y,tx,ty,tx,ty);
+    ctx.bezierCurveTo(cp2x,cp2y,cx,cy,cx,cy);
+    ctx.fillStyle=`hsla(${hue},97%,${72+s*18}%,${0.2+s*0.78})`; ctx.fill();
+    ctx.strokeStyle=`hsla(${hue-8},100%,92%,${s*0.35})`; ctx.lineWidth=0.7; ctx.stroke();
+    if (s>0.3) { // vena central
+      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(tx,ty);
+      ctx.strokeStyle=`hsla(${hue+10},100%,97%,${(s-0.3)*0.3})`; ctx.lineWidth=0.5; ctx.stroke();
+    }
+  }
+  flowerCore(cx,cy,open,scale,80,50);
+}
+
+/* ── JARDÍN GENÉRICA: cyan, blanco ── */
+function drawGardenFlower(cx, cy, open, scale) {
+  // 12 pétalos exteriores cyan
+  for (let p=0;p<12;p++) {
+    const st=(p/12)*0.13, s=open<=st?0:Math.min(1,(open-st)/(1-st));
+    if (s<0.01) continue;
+    drawPetal(cx,cy,(p/12)*Math.PI*2-Math.PI/2+T*0.003,scale*(0.06+s*0.98),scale*(0.014+s*0.21),178+p*7,0.18+s*0.74);
+  }
+  // 8 pétalos interiores blancos
+  for (let p=0;p<8;p++) {
+    const st=0.17+(p/8)*0.17, s=open<=st?0:Math.min(1,(open-st)/(1-st));
+    if (s<0.01) continue;
+    drawPetal(cx,cy,(p/8)*Math.PI*2-Math.PI/2+Math.PI/8+T*0.006,scale*(0.03+s*0.58),scale*(0.01+s*0.13),200,0.2+s*0.65);
+  }
+  flowerCore(cx,cy,open,scale,160,185);
+}
+
+/* Dispatcher */
+function drawFlower(cx, cy, open, scale) {
+  if      (flowerIdx===0) drawOrchid(cx,cy,open,scale);
+  else if (flowerIdx===1) drawGerbera(cx,cy,open,scale);
+  else if (flowerIdx===2) drawTajibo(cx,cy,open,scale);
+  else                    drawGardenFlower(cx,cy,open,scale);
 }
 
 /* Zarcillos sutiles desde las yemas */
@@ -803,25 +897,49 @@ async function startCam(mp) {
 /* ═══════════════════════════════════════════════════════════════
    UI — BOTONES + TECLADO
 ═══════════════════════════════════════════════════════════════ */
+const subbar = document.getElementById('subbar');
+
+function setFlower(i) {
+  flowerIdx = i;
+  document.querySelectorAll('.fbtn').forEach(b =>
+    b.classList.toggle('active', +b.dataset.fi === i)
+  );
+}
+
 function setMode(id) {
   mode = id;
   document.querySelectorAll('.btn').forEach(b =>
     b.classList.toggle('active', b.dataset.id === id)
   );
+  subbar.classList.toggle('show', id === 'garden');
 }
 
 MODE_LIST.forEach(({id, label}) => {
   const btn = document.createElement('div');
-  btn.className  = 'btn' + (id === mode ? ' active' : '');
-  btn.dataset.id = id;
+  btn.className   = 'btn' + (id === mode ? ' active' : '');
+  btn.dataset.id  = id;
   btn.textContent = label;
-  btn.onclick    = () => setMode(id);
+  btn.onclick     = () => setMode(id);
   bar.appendChild(btn);
 });
 
+FLOWER_DEFS.forEach(({label}, i) => {
+  const btn = document.createElement('div');
+  btn.className   = 'btn fbtn' + (i === 0 ? ' active' : '');
+  btn.dataset.fi  = i;
+  btn.textContent = label;
+  btn.onclick     = () => setFlower(i);
+  subbar.appendChild(btn);
+});
+
 window.addEventListener('keydown', e => {
-  const i = parseInt(e.key) - 1;
-  if (i >= 0 && i < MODE_LIST.length) setMode(MODE_LIST[i].id);
+  const k = e.key;
+  const modeIdx = parseInt(k) - 1;
+  if (modeIdx >= 0 && modeIdx < MODE_LIST.length) { setMode(MODE_LIST[modeIdx].id); return; }
+  if (k==='q'||k==='Q') setFlower(0);
+  if (k==='w'||k==='W') setFlower(1);
+  if (k==='e'||k==='E') setFlower(2);
+  if (k==='r'||k==='R') setFlower(3);
 });
 
 /* ═══════════════════════════════════════════════════════════════
