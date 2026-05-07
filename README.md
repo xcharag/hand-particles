@@ -4,6 +4,12 @@
 
 ## Cómo correr
 
+**Con Node.js** (recomendado):
+```bash
+node server.js
+```
+
+**Con Python**:
 ```bash
 python server.py
 ```
@@ -13,7 +19,7 @@ Necesitás una webcam y dar permiso de cámara en el navegador.
 
 ## Requisitos
 
-- Python 3.x (sin dependencias extra)
+- Node.js o Python 3.x
 - Navegador moderno (Chrome / Edge recomendado)
 - Webcam
 
