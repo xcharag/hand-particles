@@ -9,9 +9,11 @@ const PORT = 8080;
 const DIR  = __dirname;
 
 const MIME = {
-  '.html': 'text/html',
+  '.html': 'text/html; charset=utf-8',
   '.js':   'application/javascript',
   '.css':  'text/css',
+  '.wasm': 'application/wasm',
+  '.bin':  'application/octet-stream',
   '.png':  'image/png',
   '.jpg':  'image/jpeg',
   '.svg':  'image/svg+xml',
@@ -19,38 +21,28 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
-  let filePath = path.join(DIR, req.url === '/' ? 'index.html' : req.url);
-  const ext    = path.extname(filePath).toLowerCase();
+  const filePath = path.join(DIR, req.url === '/' ? 'index.html' : req.url);
+  const ext      = path.extname(filePath).toLowerCase();
 
   fs.readFile(filePath, (err, data) => {
-    if (err) {
-      res.writeHead(404);
-      res.end('Not found');
-      return;
-    }
+    if (err) { res.writeHead(404); res.end('Not found'); return; }
     res.writeHead(200, {
       'Content-Type':                MIME[ext] || 'application/octet-stream',
-      'Cross-Origin-Opener-Policy':  'same-origin',
-      'Cross-Origin-Embedder-Policy':'require-corp',
       'Access-Control-Allow-Origin': '*',
+      'Cache-Control':               'no-cache',
     });
     res.end(data);
-    console.log(`  ${req.socket.remoteAddress}  ${req.method} ${req.url}`);
+    console.log(`  ${req.method} ${req.url}`);
   });
 });
 
-const url = `http://localhost:${PORT}`;
-
 server.listen(PORT, () => {
-  console.log();
-  console.log('  ╔══════════════════════════════╗');
+  const url = `http://localhost:${PORT}`;
+  console.log('\n  ╔══════════════════════════════╗');
   console.log('  ║   hand-particles             ║');
   console.log('  ║   PromoUPSA 2026             ║');
   console.log('  ╚══════════════════════════════╝');
-  console.log(`\n  Servidor → ${url}`);
-  console.log('  Detener  → Ctrl+C\n');
-
-  // Open browser
-  const { exec } = require('child_process');
-  exec(`start ${url}`);
+  console.log(`\n  → ${url}`);
+  console.log('  Ctrl+C para detener\n');
+  require('child_process').exec(`start ${url}`);
 });

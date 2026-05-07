@@ -8,307 +8,297 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #000; overflow: hidden; }
     canvas { display: block; }
-    #webcam { display: none; }
-    #status {
+    video  { display: none; }
+
+    #tip {
       position: fixed;
-      bottom: 24px;
+      bottom: 22px;
       left: 50%;
       transform: translateX(-50%);
-      color: rgba(255, 255, 255, 0.4);
-      font-family: 'Arial', sans-serif;
-      font-size: 13px;
-      letter-spacing: 2px;
+      color: rgba(255,255,255,0.35);
+      font: 12px/1 'Arial', sans-serif;
+      letter-spacing: 2.5px;
       text-transform: uppercase;
+      white-space: nowrap;
       pointer-events: none;
     }
-    #loading {
+
+    #overlay {
       position: fixed;
       inset: 0;
       background: #000;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      flex-direction: column;
-      gap: 16px;
-      z-index: 10;
-      transition: opacity 0.8s ease;
+      gap: 14px;
+      z-index: 9;
+      transition: opacity .7s;
     }
-    #loading p {
-      color: rgba(255,255,255,0.5);
-      font-family: Arial, sans-serif;
-      font-size: 14px;
+    #overlay.gone { opacity: 0; pointer-events: none; }
+    #overlay span {
+      color: rgba(255,255,255,0.4);
+      font: 13px/1 'Arial', sans-serif;
       letter-spacing: 3px;
       text-transform: uppercase;
     }
-    .spinner {
-      width: 36px;
-      height: 36px;
-      border: 2px solid rgba(100, 180, 255, 0.2);
-      border-top-color: rgba(100, 180, 255, 0.9);
+    .ring {
+      width: 32px; height: 32px;
+      border: 2px solid rgba(80,180,255,.15);
+      border-top-color: rgba(80,180,255,.85);
       border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      animation: spin .75s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
-    #loading.hidden { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
-  <div id="loading">
-    <div class="spinner"></div>
-    <p>Cargando</p>
-  </div>
-  <canvas id="canvas"></canvas>
-  <video id="webcam" autoplay playsinline muted></video>
-  <div id="status">Iniciando cámara…</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<div id="overlay"><div class="ring"></div><span>Cargando</span></div>
+<canvas id="c"></canvas>
+<video  id="v" autoplay playsinline muted></video>
+<div    id="tip">Iniciando…</div>
 
-  <script>
-    const canvas  = document.getElementById('canvas');
-    const ctx     = canvas.getContext('2d');
-    const video   = document.getElementById('webcam');
-    const statusEl = document.getElementById('status');
-    const loadingEl = document.getElementById('loading');
+<!-- CDNs exactos -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+        crossorigin="anonymous"></script>
 
-    const NUM_PARTICLES = 3000;
-    let W = canvas.width  = window.innerWidth;
-    let H = canvas.height = window.innerHeight;
+<script>
+'use strict';
 
-    let handLandmarks = null;   // flattened array of {x,y,z} in [0-1] range
-    let particles = [];
+/* ── elementos ─────────────────────────────────── */
+const c   = document.getElementById('c');
+const ctx = c.getContext('2d');
+const vid = document.getElementById('v');
+const tip = document.getElementById('tip');
+const ov  = document.getElementById('overlay');
 
-    // ── Particle ──────────────────────────────────────────────────────────────
-    class Particle {
-      constructor(hx, hy, isText) {
-        this.homeX = hx;
-        this.homeY = hy;
-        this.x = Math.random() * W;
-        this.y = Math.random() * H;
-        this.vx = (Math.random() - 0.5) * 3;
-        this.vy = (Math.random() - 0.5) * 3;
-        this.isText = isText;
+/* ── dimensiones ───────────────────────────────── */
+let W = 0, H = 0;
 
-        if (isText) {
-          this.size    = Math.random() * 2 + 1.2;
-          this.alpha   = Math.random() * 0.4 + 0.6;
-          this.baseHue = Math.random() < 0.5
-            ? 200 + Math.random() * 40   // blue-cyan
-            : 40  + Math.random() * 20;  // gold
-        } else {
-          this.size    = Math.random() * 1.2 + 0.3;
-          this.alpha   = Math.random() * 0.25 + 0.05;
-          this.baseHue = 200 + Math.random() * 60;
-        }
+/* ── estado global ─────────────────────────────── */
+const N          = 3000;
+const TEXT_SHARE = 0.75;   // fracción de partículas ancladas al texto
 
-        this.hue  = this.baseHue;
-        this.sat  = 80;
-        this.lit  = 65;
+let pts       = [];        // array plano [x0,y0, x1,y1, ...]
+let landmarks = null;      // [{x,y,z} …] normalizados 0-1, ya espejeados
+
+/* ── clase Particle ────────────────────────────── */
+function Particle(hx, hy, isText) {
+  this.hx = hx;  this.hy = hy;
+  this.x  = Math.random() * W;
+  this.y  = Math.random() * H;
+  this.vx = 0;   this.vy = 0;
+
+  if (isText) {
+    this.r       = 1.1 + Math.random() * 2;
+    this.alpha   = 0.55 + Math.random() * 0.45;
+    this.baseHue = Math.random() < 0.55
+                   ? 200 + Math.random() * 50   /* azul → cian */
+                   :  38 + Math.random() * 18;  /* dorado */
+    this.spring  = 0.052;
+    this.rR      = 145;
+    this.rStr    = 11;
+  } else {
+    this.r       = 0.3 + Math.random() * 1;
+    this.alpha   = 0.04 + Math.random() * 0.16;
+    this.baseHue = 195 + Math.random() * 65;
+    this.spring  = 0.006;
+    this.rR      = 70;
+    this.rStr    = 3;
+  }
+
+  this.hue = this.baseHue;
+  this.lit = 65;
+}
+
+Particle.prototype.update = function () {
+  /* spring hacia home */
+  this.vx += (this.hx - this.x) * this.spring;
+  this.vy += (this.hy - this.y) * this.spring;
+
+  /* repulsión de la mano */
+  let maxPush = 0;
+  if (landmarks) {
+    const R = this.rR, S = this.rStr;
+    for (let i = 0; i < landmarks.length; i++) {
+      const lm = landmarks[i];
+      const dx = this.x - lm.sx;   /* sx/sy ya están en píxeles */
+      const dy = this.y - lm.sy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < R * R && d2 > 0.01) {
+        const d = Math.sqrt(d2);
+        const f = (R - d) / R;
+        this.vx += (dx / d) * f * S;
+        this.vy += (dy / d) * f * S;
+        if (f > maxPush) maxPush = f;
       }
+    }
+  }
 
-      update() {
-        // Spring toward home
-        const spring = this.isText ? 0.045 : 0.008;
-        this.vx += (this.homeX - this.x) * spring;
-        this.vy += (this.homeY - this.y) * spring;
+  /* cambio de color según perturbación */
+  const tH = maxPush > 0 ? this.baseHue - maxPush * 160 : this.baseHue;
+  const tL = maxPush > 0 ? 65 + maxPush * 35             : 65;
+  this.hue += (tH - this.hue) * 0.1;
+  this.lit += (tL - this.lit) * 0.1;
 
-        // Hand repulsion
-        if (handLandmarks) {
-          let maxForce = 0;
-          for (const lm of handLandmarks) {
-            const lx = (1 - lm.x) * W;   // mirror horizontally (selfie view)
-            const ly = lm.y * H;
-            const dx = this.x - lx;
-            const dy = this.y - ly;
-            const distSq = dx * dx + dy * dy;
-            const R = this.isText ? 130 : 80;
+  this.vx *= 0.86;
+  this.vy *= 0.86;
+  this.x  += this.vx;
+  this.y  += this.vy;
+};
 
-            if (distSq < R * R && distSq > 0.01) {
-              const dist  = Math.sqrt(distSq);
-              const force = (R - dist) / R;
-              const str   = this.isText ? 9 : 4;
-              this.vx += (dx / dist) * force * str;
-              this.vy += (dy / dist) * force * str;
-              if (force > maxForce) maxForce = force;
-            }
-          }
-          // Color shift when disturbed
-          const targetHue = maxForce > 0
-            ? this.baseHue - maxForce * 160   // shift toward orange/red
-            : this.baseHue;
-          const targetLit = maxForce > 0
-            ? 65 + maxForce * 35
-            : 65;
-          this.hue += (targetHue - this.hue) * 0.12;
-          this.lit += (targetLit - this.lit) * 0.12;
-        } else {
-          this.hue += (this.baseHue - this.hue) * 0.05;
-          this.lit += (65 - this.lit) * 0.05;
-        }
+Particle.prototype.draw = function () {
+  ctx.beginPath();
+  ctx.arc(this.x, this.y, this.r, 0, 6.2832);
+  ctx.fillStyle = `hsla(${this.hue},82%,${this.lit}%,${this.alpha})`;
+  ctx.fill();
+};
 
-        this.vx *= 0.87;
-        this.vy *= 0.87;
-        this.x  += this.vx;
-        this.y  += this.vy;
-      }
+/* ── muestreo de texto ─────────────────────────── */
+function sampleText() {
+  const off   = document.createElement('canvas');
+  off.width   = W;  off.height = H;
+  const o     = off.getContext('2d');
+  const cx    = W / 2, cy = H / 2;
+  const fs1   = Math.min(W / 8.5,  115);
+  const fs2   = Math.min(W / 5.5,  175);
 
-      draw() {
+  o.textAlign    = 'center';
+  o.textBaseline = 'middle';
+  o.fillStyle    = '#fff';
+  o.font         = `900 ${fs1}px Arial`;
+  o.fillText('PromoUPSA', cx, cy - fs1 * 0.82);
+  o.font         = `900 ${fs2}px Arial`;
+  o.fillText('2026', cx, cy + fs2 * 0.52);
+
+  const px   = o.getImageData(0, 0, W, H).data;
+  const step = Math.max(3, Math.floor(Math.sqrt((W * H) / 45000)));
+  const out  = [];
+
+  for (let y = 0; y < H; y += step)
+    for (let x = 0; x < W; x += step)
+      if (px[(y * W + x) * 4 + 3] > 128)
+        out.push(x, y);
+
+  /* Fisher-Yates sobre pares */
+  for (let i = out.length / 2 - 1; i > 0; i--) {
+    const j  = (Math.random() * (i + 1)) | 0;
+    const tx = out[i*2], ty = out[i*2+1];
+    out[i*2] = out[j*2];  out[i*2+1] = out[j*2+1];
+    out[j*2] = tx;         out[j*2+1] = ty;
+  }
+  return out;
+}
+
+/* ── inicialización ────────────────────────────── */
+function init() {
+  W = c.width  = window.innerWidth;
+  H = c.height = window.innerHeight;
+
+  pts = sampleText();
+  const textN = Math.min((N * TEXT_SHARE) | 0, pts.length / 2);
+  const arr   = new Array(N);
+
+  for (let i = 0; i < N; i++) {
+    arr[i] = i < textN
+      ? new Particle(pts[i * 2], pts[i * 2 + 1], true)
+      : new Particle(Math.random() * W, Math.random() * H, false);
+  }
+  return arr;
+}
+
+let particles = init();
+window.addEventListener('resize', () => { particles = init(); });
+
+/* ── bucle de render ───────────────────────────── */
+/* índices de landmarks clave: muñeca + puntas de dedos */
+const KEY = [0, 4, 8, 12, 16, 20];
+
+function frame() {
+  /* trail effect */
+  ctx.fillStyle = 'rgba(0,0,8,0.17)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (let i = 0; i < particles.length; i++) {
+    particles[i].update();
+    particles[i].draw();
+  }
+
+  /* glow en puntos clave de cada mano */
+  if (landmarks) {
+    const handsN = landmarks.length / 21;
+    for (let h = 0; h < handsN; h++) {
+      for (let k = 0; k < KEY.length; k++) {
+        const lm = landmarks[h * 21 + KEY[k]];
+        if (!lm) continue;
+        const g = ctx.createRadialGradient(lm.sx, lm.sy, 0, lm.sx, lm.sy, 24);
+        g.addColorStop(0, 'rgba(120,205,255,0.3)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fillStyle = `hsla(${this.hue},${this.sat}%,${this.lit}%,${this.alpha})`;
+        ctx.arc(lm.sx, lm.sy, 24, 0, 6.2832);
+        ctx.fillStyle = g;
         ctx.fill();
       }
     }
+  }
 
-    // ── Sample text pixels ────────────────────────────────────────────────────
-    function sampleTextPositions() {
-      const off  = document.createElement('canvas');
-      off.width  = W;
-      off.height = H;
-      const octx = off.getContext('2d');
+  requestAnimationFrame(frame);
+}
+frame();
 
-      const fs1 = Math.max(36, Math.min(W / 9, 110));
-      const fs2 = Math.max(52, Math.min(W / 6, 160));
-      const cx  = W / 2;
-      const cy  = H / 2;
+/* ── MediaPipe Hands ───────────────────────────── */
+function buildHands() {
+  const mp = new Hands({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+  });
 
-      octx.textAlign    = 'center';
-      octx.textBaseline = 'middle';
-      octx.fillStyle    = 'white';
+  mp.setOptions({
+    maxNumHands: 2,
+    modelComplexity: 1,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.5
+  });
 
-      octx.font = `900 ${fs1}px Arial, sans-serif`;
-      octx.fillText('PromoUPSA', cx, cy - fs1 * 0.75);
-
-      octx.font = `900 ${fs2}px Arial, sans-serif`;
-      octx.fillText('2026', cx, cy + fs2 * 0.55);
-
-      const img  = octx.getImageData(0, 0, W, H).data;
-      const step = Math.max(3, Math.floor(Math.sqrt((W * H) / 40000)));
-      const pts  = [];
-
-      for (let y = 0; y < H; y += step) {
-        for (let x = 0; x < W; x += step) {
-          if (img[(y * W + x) * 4 + 3] > 120) pts.push({ x, y });
-        }
-      }
-
-      // shuffle
-      for (let i = pts.length - 1; i > 0; i--) {
-        const j = Math.random() * (i + 1) | 0;
-        [pts[i], pts[j]] = [pts[j], pts[i]];
-      }
-      return pts;
+  mp.onResults(r => {
+    if (r.multiHandLandmarks && r.multiHandLandmarks.length) {
+      /* aplanar todas las manos y precalcular coordenadas en píxeles */
+      landmarks = r.multiHandLandmarks.flat().map(lm => ({
+        x: lm.x, y: lm.y, z: lm.z,
+        sx: (1 - lm.x) * W,  /* espejo (vista selfie) */
+        sy: lm.y * H
+      }));
+      tip.textContent = '✋  mano detectada — movela para interactuar';
+    } else {
+      landmarks = null;
+      tip.textContent = 'Acercá tu mano a la cámara';
     }
+  });
 
-    // ── Init particles ────────────────────────────────────────────────────────
-    function initParticles() {
-      W = canvas.width  = window.innerWidth;
-      H = canvas.height = window.innerHeight;
+  return mp;
+}
 
-      const textPts = sampleTextPositions();
-      const textCount = Math.min(NUM_PARTICLES * 0.72 | 0, textPts.length);
-      particles = [];
-
-      for (let i = 0; i < NUM_PARTICLES; i++) {
-        if (i < textCount) {
-          const p = textPts[i];
-          particles.push(new Particle(p.x, p.y, true));
-        } else {
-          particles.push(new Particle(
-            Math.random() * W,
-            Math.random() * H,
-            false
-          ));
-        }
-      }
-    }
-
-    // ── Render loop ───────────────────────────────────────────────────────────
-    function animate() {
-      ctx.fillStyle = 'rgba(0, 0, 8, 0.18)';
-      ctx.fillRect(0, 0, W, H);
-
-      for (const p of particles) {
-        p.update();
-        p.draw();
-      }
-
-      // Draw subtle glow at hand key points (wrist + fingertips)
-      if (handLandmarks) {
-        const keyIdx = [0, 4, 8, 12, 16, 20]; // wrist + fingertips
-        for (const lm of handLandmarks) {
-          if (!keyIdx.includes(handLandmarks.indexOf(lm) % 21)) continue;
-          const lx = (1 - lm.x) * W;
-          const ly = lm.y * H;
-          const g  = ctx.createRadialGradient(lx, ly, 0, lx, ly, 18);
-          g.addColorStop(0, 'rgba(120,200,255,0.25)');
-          g.addColorStop(1, 'rgba(0,0,0,0)');
-          ctx.beginPath();
-          ctx.arc(lx, ly, 18, 0, Math.PI * 2);
-          ctx.fillStyle = g;
-          ctx.fill();
-        }
-      }
-
-      requestAnimationFrame(animate);
-    }
-
-    // ── MediaPipe Hands ───────────────────────────────────────────────────────
-    const hands = new Hands({
-      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+/* ── cámara ────────────────────────────────────── */
+async function startCam(mp) {
+  try {
+    const cam = new Camera(vid, {
+      onFrame: async () => mp.send({ image: vid }),
+      width: 640,
+      height: 480
     });
+    await cam.start();
+    tip.textContent = 'Acercá tu mano a la cámara';
+  } catch (err) {
+    tip.textContent = 'Sin cámara — partículas activas';
+    console.warn('Camera:', err.message);
+  }
+  ov.classList.add('gone');
+  setTimeout(() => ov.remove(), 750);
+}
 
-    hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.6,
-      minTrackingConfidence: 0.5
-    });
-
-    hands.onResults(results => {
-      if (results.multiHandLandmarks?.length) {
-        handLandmarks = results.multiHandLandmarks.flat();
-        statusEl.textContent = '✋ Mano detectada — muévela para interactuar';
-      } else {
-        handLandmarks = null;
-        statusEl.textContent = 'Acercá tu mano a la cámara';
-      }
-    });
-
-    // ── Camera ────────────────────────────────────────────────────────────────
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 640, height: 480, facingMode: 'user' }
-        });
-        video.srcObject = stream;
-
-        const camera = new Camera(video, {
-          onFrame: async () => { await hands.send({ image: video }); },
-          width: 640,
-          height: 480
-        });
-
-        await camera.start();
-
-        loadingEl.classList.add('hidden');
-        setTimeout(() => loadingEl.remove(), 900);
-        statusEl.textContent = 'Acercá tu mano a la cámara';
-      } catch (err) {
-        loadingEl.querySelector('p').textContent = 'Sin acceso a cámara';
-        loadingEl.querySelector('.spinner').style.display = 'none';
-        statusEl.textContent = 'Cámara no disponible — las partículas siguen activas';
-        loadingEl.classList.add('hidden');
-        setTimeout(() => loadingEl.remove(), 900);
-        console.warn('Camera error:', err.message);
-      }
-    }
-
-    window.addEventListener('resize', initParticles);
-
-    initParticles();
-    animate();
-    startCamera();
-  </script>
+startCam(buildHands());
+</script>
 </body>
 </html>
