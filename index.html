@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PromoUPSA 2026</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; overflow: hidden; }
+    canvas { display: block; }
+    #webcam { display: none; }
+    #status {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.4);
+      font-family: 'Arial', sans-serif;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+    #loading {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      z-index: 10;
+      transition: opacity 0.8s ease;
+    }
+    #loading p {
+      color: rgba(255,255,255,0.5);
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    .spinner {
+      width: 36px;
+      height: 36px;
+      border: 2px solid rgba(100, 180, 255, 0.2);
+      border-top-color: rgba(100, 180, 255, 0.9);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading.hidden { opacity: 0; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="loading">
+    <div class="spinner"></div>
+    <p>Cargando</p>
+  </div>
+  <canvas id="canvas"></canvas>
+  <video id="webcam" autoplay playsinline muted></video>
+  <div id="status">Iniciando cámara…</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+  <script>
+    const canvas  = document.getElementById('canvas');
+    const ctx     = canvas.getContext('2d');
+    const video   = document.getElementById('webcam');
+    const statusEl = document.getElementById('status');
+    const loadingEl = document.getElementById('loading');
+
+    const NUM_PARTICLES = 3000;
+    let W = canvas.width  = window.innerWidth;
+    let H = canvas.height = window.innerHeight;
+
+    let handLandmarks = null;   // flattened array of {x,y,z} in [0-1] range
+    let particles = [];
+
+    // ── Particle ──────────────────────────────────────────────────────────────
+    class Particle {
+      constructor(hx, hy, isText) {
+        this.homeX = hx;
+        this.homeY = hy;
+        this.x = Math.random() * W;
+        this.y = Math.random() * H;
+        this.vx = (Math.random() - 0.5) * 3;
+        this.vy = (Math.random() - 0.5) * 3;
+        this.isText = isText;
+
+        if (isText) {
+          this.size    = Math.random() * 2 + 1.2;
+          this.alpha   = Math.random() * 0.4 + 0.6;
+          this.baseHue = Math.random() < 0.5
+            ? 200 + Math.random() * 40   // blue-cyan
+            : 40  + Math.random() * 20;  // gold
+        } else {
+          this.size    = Math.random() * 1.2 + 0.3;
+          this.alpha   = Math.random() * 0.25 + 0.05;
+          this.baseHue = 200 + Math.random() * 60;
+        }
+
+        this.hue  = this.baseHue;
+        this.sat  = 80;
+        this.lit  = 65;
+      }
+
+      update() {
+        // Spring toward home
+        const spring = this.isText ? 0.045 : 0.008;
+        this.vx += (this.homeX - this.x) * spring;
+        this.vy += (this.homeY - this.y) * spring;
+
+        // Hand repulsion
+        if (handLandmarks) {
+          let maxForce = 0;
+          for (const lm of handLandmarks) {
+            const lx = (1 - lm.x) * W;   // mirror horizontally (selfie view)
+            const ly = lm.y * H;
+            const dx = this.x - lx;
+            const dy = this.y - ly;
+            const distSq = dx * dx + dy * dy;
+            const R = this.isText ? 130 : 80;
+
+            if (distSq < R * R && distSq > 0.01) {
+              const dist  = Math.sqrt(distSq);
+              const force = (R - dist) / R;
+              const str   = this.isText ? 9 : 4;
+              this.vx += (dx / dist) * force * str;
+              this.vy += (dy / dist) * force * str;
+              if (force > maxForce) maxForce = force;
+            }
+          }
+          // Color shift when disturbed
+          const targetHue = maxForce > 0
+            ? this.baseHue - maxForce * 160   // shift toward orange/red
+            : this.baseHue;
+          const targetLit = maxForce > 0
+            ? 65 + maxForce * 35
+            : 65;
+          this.hue += (targetHue - this.hue) * 0.12;
+          this.lit += (targetLit - this.lit) * 0.12;
+        } else {
+          this.hue += (this.baseHue - this.hue) * 0.05;
+          this.lit += (65 - this.lit) * 0.05;
+        }
+
+        this.vx *= 0.87;
+        this.vy *= 0.87;
+        this.x  += this.vx;
+        this.y  += this.vy;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = `hsla(${this.hue},${this.sat}%,${this.lit}%,${this.alpha})`;
+        ctx.fill();
+      }
+    }
+
+    // ── Sample text pixels ────────────────────────────────────────────────────
+    function sampleTextPositions() {
+      const off  = document.createElement('canvas');
+      off.width  = W;
+      off.height = H;
+      const octx = off.getContext('2d');
+
+      const fs1 = Math.max(36, Math.min(W / 9, 110));
+      const fs2 = Math.max(52, Math.min(W / 6, 160));
+      const cx  = W / 2;
+      const cy  = H / 2;
+
+      octx.textAlign    = 'center';
+      octx.textBaseline = 'middle';
+      octx.fillStyle    = 'white';
+
+      octx.font = `900 ${fs1}px Arial, sans-serif`;
+      octx.fillText('PromoUPSA', cx, cy - fs1 * 0.75);
+
+      octx.font = `900 ${fs2}px Arial, sans-serif`;
+      octx.fillText('2026', cx, cy + fs2 * 0.55);
+
+      const img  = octx.getImageData(0, 0, W, H).data;
+      const step = Math.max(3, Math.floor(Math.sqrt((W * H) / 40000)));
+      const pts  = [];
+
+      for (let y = 0; y < H; y += step) {
+        for (let x = 0; x < W; x += step) {
+          if (img[(y * W + x) * 4 + 3] > 120) pts.push({ x, y });
+        }
+      }
+
+      // shuffle
+      for (let i = pts.length - 1; i > 0; i--) {
+        const j = Math.random() * (i + 1) | 0;
+        [pts[i], pts[j]] = [pts[j], pts[i]];
+      }
+      return pts;
+    }
+
+    // ── Init particles ────────────────────────────────────────────────────────
+    function initParticles() {
+      W = canvas.width  = window.innerWidth;
+      H = canvas.height = window.innerHeight;
+
+      const textPts = sampleTextPositions();
+      const textCount = Math.min(NUM_PARTICLES * 0.72 | 0, textPts.length);
+      particles = [];
+
+      for (let i = 0; i < NUM_PARTICLES; i++) {
+        if (i < textCount) {
+          const p = textPts[i];
+          particles.push(new Particle(p.x, p.y, true));
+        } else {
+          particles.push(new Particle(
+            Math.random() * W,
+            Math.random() * H,
+            false
+          ));
+        }
+      }
+    }
+
+    // ── Render loop ───────────────────────────────────────────────────────────
+    function animate() {
+      ctx.fillStyle = 'rgba(0, 0, 8, 0.18)';
+      ctx.fillRect(0, 0, W, H);
+
+      for (const p of particles) {
+        p.update();
+        p.draw();
+      }
+
+      // Draw subtle glow at hand key points (wrist + fingertips)
+      if (handLandmarks) {
+        const keyIdx = [0, 4, 8, 12, 16, 20]; // wrist + fingertips
+        for (const lm of handLandmarks) {
+          if (!keyIdx.includes(handLandmarks.indexOf(lm) % 21)) continue;
+          const lx = (1 - lm.x) * W;
+          const ly = lm.y * H;
+          const g  = ctx.createRadialGradient(lx, ly, 0, lx, ly, 18);
+          g.addColorStop(0, 'rgba(120,200,255,0.25)');
+          g.addColorStop(1, 'rgba(0,0,0,0)');
+          ctx.beginPath();
+          ctx.arc(lx, ly, 18, 0, Math.PI * 2);
+          ctx.fillStyle = g;
+          ctx.fill();
+        }
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // ── MediaPipe Hands ───────────────────────────────────────────────────────
+    const hands = new Hands({
+      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.6,
+      minTrackingConfidence: 0.5
+    });
+
+    hands.onResults(results => {
+      if (results.multiHandLandmarks?.length) {
+        handLandmarks = results.multiHandLandmarks.flat();
+        statusEl.textContent = '✋ Mano detectada — muévela para interactuar';
+      } else {
+        handLandmarks = null;
+        statusEl.textContent = 'Acercá tu mano a la cámara';
+      }
+    });
+
+    // ── Camera ────────────────────────────────────────────────────────────────
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 480, facingMode: 'user' }
+        });
+        video.srcObject = stream;
+
+        const camera = new Camera(video, {
+          onFrame: async () => { await hands.send({ image: video }); },
+          width: 640,
+          height: 480
+        });
+
+        await camera.start();
+
+        loadingEl.classList.add('hidden');
+        setTimeout(() => loadingEl.remove(), 900);
+        statusEl.textContent = 'Acercá tu mano a la cámara';
+      } catch (err) {
+        loadingEl.querySelector('p').textContent = 'Sin acceso a cámara';
+        loadingEl.querySelector('.spinner').style.display = 'none';
+        statusEl.textContent = 'Cámara no disponible — las partículas siguen activas';
+        loadingEl.classList.add('hidden');
+        setTimeout(() => loadingEl.remove(), 900);
+        console.warn('Camera error:', err.message);
+      }
+    }
+
+    window.addEventListener('resize', initParticles);
+
+    initParticles();
+    animate();
+    startCamera();
+  </script>
+</body>
+</html>
