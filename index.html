@@ -250,68 +250,176 @@ function renderParticles() {
 
 /* ═══════════════════════════════════════════════════════════════
    MODE 2 — GARDEN
-   Fractales / flores crecen desde las puntas de los dedos
+   Flor en la palma reacciona a la apertura de la mano
+   Puño = capullo cerrado · Abriendo = pétalos uno a uno · Abierta = plena floración
 ═══════════════════════════════════════════════════════════════ */
-function branch(x, y, angle, len, depth, hue) {
-  if (depth <= 0 || len < 2) return;
-  const ex = x + Math.cos(angle)*len;
-  const ey = y + Math.sin(angle)*len;
-  const glitch = Math.random() < 0.04;
+let gardenOpen = [0, 0]; // apertura suavizada por mano (hasta 2)
 
-  if (glitch) {
-    ctx.beginPath(); ctx.moveTo(x+4,y); ctx.lineTo(ex+4,ey);
-    ctx.strokeStyle = 'rgba(255,0,80,0.4)';
-    ctx.lineWidth = depth*0.6; ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x-4,y); ctx.lineTo(ex-4,ey);
-    ctx.strokeStyle = 'rgba(0,180,255,0.4)';
-    ctx.stroke();
-  }
+/* Devuelve 0 (puño) → 1 (mano abierta)
+   Métrica: distancia promedio yemas↔centro palma, normalizada por tamaño de mano */
+function measureOpen(lms) {
+  let pcx = 0, pcy = 0;
+  [0, 5, 9, 13, 17].forEach(i => { pcx += lms[i].sx; pcy += lms[i].sy; });
+  pcx /= 5; pcy /= 5;
+  const ref = Math.hypot(lms[9].sx - lms[0].sx, lms[9].sy - lms[0].sy) || 100;
+  let d = 0;
+  [4, 8, 12, 16, 20].forEach(i => d += Math.hypot(lms[i].sx - pcx, lms[i].sy - pcy));
+  return Math.max(0, Math.min(1, (d/5/ref - 0.55) / 1.65));
+}
+
+/* Dibuja un pétalo (bezier de doble curva) desde (cx,cy) en dirección angle */
+function drawPetal(cx, cy, angle, len, width, hue, alpha) {
+  const tx   = cx + Math.cos(angle)*len;
+  const ty   = cy + Math.sin(angle)*len;
+  const perp = angle + Math.PI/2;
+  const m    = 0.52;
+  const cp1x = cx + Math.cos(angle)*len*m + Math.cos(perp)*width;
+  const cp1y = cy + Math.sin(angle)*len*m + Math.sin(perp)*width;
+  const cp2x = cx + Math.cos(angle)*len*m - Math.cos(perp)*width;
+  const cp2y = cy + Math.sin(angle)*len*m - Math.sin(perp)*width;
 
   ctx.beginPath();
-  ctx.moveTo(x, y); ctx.lineTo(ex, ey);
-  ctx.strokeStyle = `hsla(${hue + depth*18 + Math.sin(T*0.02)*25},90%,62%,${depth/5*0.95})`;
-  ctx.lineWidth   = depth * 0.75;
-  ctx.lineCap     = 'round';
+  ctx.moveTo(cx, cy);
+  ctx.bezierCurveTo(cp1x, cp1y, tx, ty, tx, ty);
+  ctx.bezierCurveTo(cp2x, cp2y, cx, cy, cx, cy);
+  ctx.fillStyle   = `hsla(${hue},90%,65%,${alpha})`;
+  ctx.fill();
+  ctx.strokeStyle = `hsla(${hue+28},100%,88%,${alpha*0.4})`;
+  ctx.lineWidth   = 0.6;
   ctx.stroke();
+}
 
-  if (depth === 1) {
-    for (let p = 0; p < 6; p++) {
-      const pa = p/6*Math.PI*2;
-      const r  = 4 + Math.sin(T*0.06)*1.5;
-      ctx.beginPath();
-      ctx.arc(ex + Math.cos(pa)*r, ey + Math.sin(pa)*r, 2.5, 0, 6.2832);
-      ctx.fillStyle = `hsla(${hue+70},100%,80%,0.9)`;
-      ctx.fill();
-    }
-    ctx.beginPath();
-    ctx.arc(ex, ey, 3, 0, 6.2832);
-    ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    ctx.fill();
+/* Dibuja la flor completa en (cx,cy) con apertura open∈[0,1] y escala scale */
+function drawFlower(cx, cy, open, scale) {
+  /* ── capa exterior: 6 pétalos, se abren escalonados ── */
+  const N1 = 6;
+  for (let p = 0; p < N1; p++) {
+    const start   = (p / N1) * 0.28;            // cada pétalo empieza en distinto momento
+    const stagger = open <= start ? 0 : Math.min(1, (open - start) / (1 - start));
+    if (stagger < 0.01) continue;
+
+    const ang   = (p/N1)*Math.PI*2 - Math.PI/2 + T*0.004;
+    const len   = scale*(0.07 + stagger*1.15);
+    const wid   = scale*(0.02 + stagger*0.33);
+    const hue   = 270 + p*14 + open*55;         // violeta → rosa → blanco
+    const alpha = 0.18 + stagger*0.75;
+    drawPetal(cx, cy, ang, len, wid, hue, alpha);
   }
 
-  const spread = 0.42 + Math.sin(T*0.025)*0.08;
-  branch(ex, ey, angle - spread,      len*0.65, depth-1, hue);
-  branch(ex, ey, angle + spread*0.88, len*0.65, depth-1, hue);
+  /* ── capa interior: 6 pétalos dorados, abren más tarde ── */
+  const N2 = 6;
+  for (let p = 0; p < N2; p++) {
+    const start   = 0.2 + (p/N2)*0.22;
+    const stagger = open <= start ? 0 : Math.min(1, (open - start) / (1 - start));
+    if (stagger < 0.01) continue;
+
+    const ang   = (p/N2)*Math.PI*2 - Math.PI/2 + Math.PI/N2 + T*0.007;
+    const len   = scale*(0.03 + stagger*0.68);
+    const wid   = scale*(0.012 + stagger*0.17);
+    const hue   = 38 + p*9 + T*0.35;
+    const alpha = 0.22 + stagger*0.68;
+    drawPetal(cx, cy, ang, len, wid, hue, alpha);
+  }
+
+  /* ── estambre central ── */
+  const cr = scale*(0.04 + open*0.09);
+  const g  = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr*2.8);
+  g.addColorStop(0,   `hsla(55,100%,98%,${0.65+open*0.35})`);
+  g.addColorStop(0.4, `hsla(44,100%,78%,${0.45+open*0.45})`);
+  g.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.arc(cx, cy, cr*2.8, 0, 6.2832);
+  ctx.fillStyle = g; ctx.fill();
+
+  /* ── capullo (visible cuando cerrado) ── */
+  if (open < 0.32) {
+    const bt = 1 - open/0.32;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - scale*0.09*bt, scale*0.1*bt, scale*0.22*bt, 0, 0, 6.2832);
+    ctx.fillStyle   = `hsla(130,70%,28%,${0.55*bt})`;
+    ctx.strokeStyle = `hsla(145,80%,52%,${0.7*bt})`;
+    ctx.lineWidth   = 1.2; ctx.fill(); ctx.stroke();
+    // sépalos
+    for (let s = 0; s < 3; s++) {
+      const sa = s/3*Math.PI*2 - Math.PI/2 + 0.3;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy + scale*0.05*bt);
+      ctx.quadraticCurveTo(
+        cx + Math.cos(sa)*scale*0.14*bt, cy + Math.sin(sa)*scale*0.14*bt,
+        cx + Math.cos(sa)*scale*0.06*bt, cy + Math.sin(sa)*scale*0.06*bt - scale*0.12*bt
+      );
+      ctx.strokeStyle = `hsla(130,80%,45%,${0.55*bt})`;
+      ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  }
+
+  /* ── destellos cuando plena floración ── */
+  if (open > 0.85) {
+    const sparkA = (open - 0.85) / 0.15;
+    for (let s = 0; s < 14; s++) {
+      const sa = s/14*Math.PI*2 + T*0.014;
+      const sr = scale*(0.78 + Math.sin(T*0.055 + s)*0.18);
+      ctx.beginPath();
+      ctx.arc(cx + Math.cos(sa)*sr, cy + Math.sin(sa)*sr, 1.8, 0, 6.2832);
+      ctx.fillStyle = `hsla(55,100%,92%,${sparkA*0.88})`;
+      ctx.fill();
+    }
+  }
+}
+
+/* Zarcillos sutiles desde las yemas */
+function tendril(x, y, angle, len, depth, hue) {
+  if (depth <= 0 || len < 3) return;
+  const ex = x + Math.cos(angle + Math.sin(T*0.018+depth)*0.28)*len;
+  const ey = y + Math.sin(angle + Math.sin(T*0.018+depth)*0.28)*len;
+  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey);
+  ctx.strokeStyle = `hsla(${hue+depth*14},80%,55%,${depth/4*0.65})`;
+  ctx.lineWidth   = depth*0.5; ctx.lineCap = 'round'; ctx.stroke();
+  tendril(ex, ey, angle - 0.38, len*0.67, depth-1, hue);
+  tendril(ex, ey, angle + 0.38, len*0.67, depth-1, hue);
 }
 
 function renderGarden() {
   ctx.globalCompositeOperation = 'lighter';
+
   if (landmarks) {
-    const handsN = Math.floor(landmarks.length/21);
-    const tips = [4,8,12,16,20];
-    const mids = [3,7,11,15,19];
+    const handsN = Math.floor(landmarks.length / 21);
+    const tips = [4, 8, 12, 16, 20];
+    const mids = [3, 7, 11, 15, 19];
+
     for (let h = 0; h < handsN; h++) {
-      tips.forEach((ti, fi) => {
-        const tip = landmarks[h*21+ti];
-        const mid = landmarks[h*21+mids[fi]];
-        const ang = Math.atan2(tip.sy-mid.sy, tip.sx-mid.sx) - Math.PI/2;
-        branch(tip.sx, tip.sy, ang, 48, 5, 80 + fi*28);
-      });
+      const lms = landmarks.slice(h*21, (h+1)*21);
+
+      // Medir apertura y suavizar (lerp 12% por frame → transición ~8 frames)
+      const raw = measureOpen(lms);
+      gardenOpen[h] = (gardenOpen[h] || 0) + (raw - (gardenOpen[h] || 0)) * 0.12;
+      const open = gardenOpen[h];
+
+      // Centro de la palma
+      let pcx = 0, pcy = 0;
+      [0, 5, 9, 13, 17].forEach(i => { pcx += lms[i].sx; pcy += lms[i].sy; });
+      pcx /= 5; pcy /= 5;
+
+      // Escala: distancia muñeca→nudillo medio
+      const scale = Math.hypot(lms[9].sx - lms[0].sx, lms[9].sy - lms[0].sy);
+
+      // Zarcillos desde yemas (solo cuando la mano está algo abierta)
+      if (open > 0.15) {
+        tips.forEach((ti, fi) => {
+          const tip = lms[ti], mid = lms[mids[fi]];
+          const ang = Math.atan2(tip.sy-mid.sy, tip.sx-mid.sx) - Math.PI/2;
+          tendril(tip.sx, tip.sy, ang, scale*0.3*open, 4, 80+fi*24);
+        });
+      }
+
+      // Flor centrada en la palma
+      drawFlower(pcx, pcy, open, scale);
     }
   } else {
-    // idle: árbol desde el centro inferior
-    branch(W/2, H*0.72, -Math.PI/2, 75, 6, 100 + Math.sin(T*0.015)*30);
+    // Sin mano: capullo que respira suavemente
+    const breathe = 0.12 + Math.sin(T*0.022)*0.08;
+    drawFlower(W/2, H/2, breathe, 130);
   }
+
   ctx.globalCompositeOperation = 'source-over';
   drawWatermark();
 }
