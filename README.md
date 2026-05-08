@@ -25,6 +25,12 @@ Abre `http://localhost:8080` automáticamente. Permite el acceso a la cámara cu
 | 6 | **Circuit** | Trazos PCB generados desde los dedos con vias y snap a grilla |
 | 7 | **Wireframe** | Malla triangulada 3D sobre la mano con scan line de escáner |
 | 8 | **Sound Wave** | Ondas concéntricas desde la palma + formas de onda horizontales |
+| 9 | **Hacker** | Comandos de terminal reales cayendo en lluvia; la mano activa "ACCESO CONCEDIDO" |
+| 10 | **AI Scan** | Ciclo automático: escaneo facial → barras de análisis (lógica, creatividad…) → "COMPATIBILIDAD: 99%" |
+| 11 | **Game** | Breakout retro a pantalla completa; el dedo índice controla el paddle. Botones Y/X/B/A sobre las puntas de los dedos, 3 vidas, ladrillos multicolor con glow |
+| 12 | **Robot Arm** | Brazo industrial articulado con cinemática inversa 2D que sigue el movimiento de la mano |
+| 13 | **DNA** | Doble hélice animada que se distorsiona por proximidad de la mano |
+| 14 | **Network** | Nodos de red etiquetados (SERVER, API, DATABASE, CLOUD…) que se expanden desde la palma con paquetes de datos animados |
 
 **Botón de cámara** (esquina superior derecha): alterna entre Color / B&W / Sin cámara.
 
