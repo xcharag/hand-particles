@@ -1176,7 +1176,7 @@ function renderAIScan() {
     const p = aiTimer/80;
     ctx.textAlign='center'; ctx.shadowColor=ACCENT; ctx.shadowBlur=10*p;
     ctx.font=`600 13px Inter,sans-serif`; ctx.fillStyle=`rgba(${A},${p})`;
-    ctx.fillText('SISTEMA DE ANÁLISIS IA v2.6'+'…'.slice(0,(aiTimer/18)|0%4), cx, cy-16);
+    ctx.fillText('SISTEMA DE ANÁLISIS IA v2.6'+'...'.slice(0,(aiTimer/18)%4), cx, cy-16);
     ctx.shadowBlur=0; ctx.font='400 9px Inter,sans-serif';
     ctx.fillStyle=`rgba(${A},${p*.5})`; ctx.fillText('UPSA · Ingeniería de Sistemas', cx, cy+8);
   }
@@ -1333,7 +1333,9 @@ function renderGame() {
     ball.vy=-Math.abs(ball.vy);
     /* ángulo según posición en el paddle */
     const rel=(ball.x-(paddle.x+paddle.w/2))/(paddle.w/2);
+    const minSpd=Math.min(W,H)*.003;
     ball.vx=rel*Math.min(W,H)*.008;
+    if(Math.abs(ball.vx)<minSpd) ball.vx=minSpd*(ball.vx>=0?1:-1);
   }
   /* colisión ladrillos */
   bricks.forEach(b=>{
@@ -1426,7 +1428,7 @@ function armSeg(x1,y1,x2,y2,w1,w2){
 
 function renderRobotArm(){
   const L1=H*.29, L2=H*.23;
-  const bx=W/2, by=H-28;
+  const bx=W/2, by=H-64;
   /* target: palma o animación demo */
   let tx,ty;
   if(handsData.length>0){const pc=palmCenter(handsData[0].landmarks);tx=pc.x;ty=pc.y;}
