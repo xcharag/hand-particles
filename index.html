@@ -3,951 +3,1841 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PromoUPSA 2026</title>
+  <title>PromoUPSA 2026 — Ing. de Sistemas</title>
+
+  <!-- ── FONTS ─────────────────────────────────────────────────────────────
+       Space Grotesk → logo / headings  (carácter fuerte, tech premium)
+       Inter          → UI / cuerpo     (legible, neutral, moderno)
+  ──────────────────────────────────────────────────────────────────────── -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #000; overflow: hidden; font-family: Arial, sans-serif; }
-    canvas { display: block; }
+    /* ═══════════════════════════════════════════════════════════════════
+       DESIGN TOKENS  —  verde militar UPSA como color institucional
+    ═══════════════════════════════════════════════════════════════════ */
+    :root {
+      /* Color base */
+      --bg:          #050508;
+      --bg-mid:      rgba(8,12,8,0.92);
+      --surface:     rgba(91,181,58,0.04);
+      --border:      rgba(91,181,58,0.12);
+      --border-dim:  rgba(255,255,255,0.07);
+
+      /* Verde militar UPSA */
+      --accent:      #5bb53a;
+      --accent-rgb:  91,181,58;
+      --accent-glow: rgba(91,181,58,0.16);
+      --accent-dim:  rgba(91,181,58,0.45);
+      --accent-dark: rgba(91,181,58,0.08);
+
+      /* Tipografía */
+      --text:        rgba(255,255,255,0.92);
+      --muted:       rgba(255,255,255,0.36);
+      --font-logo:   'Space Grotesk', -apple-system, sans-serif;
+      --font-ui:     'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+      /* Transiciones */
+      --ease:        cubic-bezier(0.22,1,0.36,1);
+      --t-fast:      0.15s;
+      --t-mid:       0.25s;
+    }
+
+    /* ─── RESET ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    body   { background: var(--bg); overflow: hidden; font-family: var(--font-ui); }
+    canvas { display: block; position: fixed; inset: 0; }
     video  { display: none; }
 
-    #bar {
-      position: fixed;
-      bottom: 0; left: 0; right: 0;
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 10px 12px 14px;
-      background: linear-gradient(transparent, rgba(0,0,0,0.8));
-      z-index: 10;
+    /* ─── LOGO (top-center) ──────────────────────────────────────────── */
+    #logo {
+      position: fixed; top: 0; left: 0; right: 0;
+      display: flex; justify-content: center;
+      padding: 16px 20px 0;
+      z-index: 10; pointer-events: none;
     }
-    .btn {
-      cursor: pointer;
-      padding: 5px 13px;
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 20px;
-      color: rgba(255,255,255,0.4);
-      font-size: 11px;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      background: rgba(255,255,255,0.04);
-      transition: all .18s;
+    .logo-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .logo-eyebrow {
+      font: 600 8px/1 var(--font-ui); letter-spacing: 5px;
+      text-transform: uppercase; color: var(--accent); opacity: 0.7;
+    }
+    .logo-title {
+      font: 700 42px/1 var(--font-logo); letter-spacing: -1px; color: #fff;
+    }
+    .logo-title em { color: var(--accent); font-style: normal; }
+    .logo-sub {
+      font: 400 9px/1 var(--font-ui); letter-spacing: 6px;
+      text-transform: uppercase; color: var(--muted);
+    }
+
+    /* ─── CÁMARA TOGGLE (top-right) ──────────────────────────────────── */
+    #cam-toggle {
+      position: fixed; top: 16px; right: 16px; z-index: 10;
+      display: flex; gap: 2px;
+      background: var(--bg-mid); backdrop-filter: blur(16px);
+      border: 1px solid var(--border); border-radius: 8px; padding: 3px;
+    }
+    .cbtn {
+      cursor: pointer; padding: 5px 11px; border-radius: 5px;
+      color: var(--muted); font: 500 9px/1 var(--font-ui);
+      letter-spacing: 1.5px; text-transform: uppercase;
+      transition: color var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
       user-select: none;
     }
-    .btn:hover { color: rgba(255,255,255,0.85); background: rgba(255,255,255,0.1); }
+    .cbtn:hover { color: var(--text); }
+    .cbtn.active { color: var(--accent); background: var(--accent-glow); }
+
+    /* ─── BARRA INFERIOR ─────────────────────────────────────────────── */
+    #bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      display: flex; justify-content: center; flex-wrap: wrap; gap: 5px;
+      padding: 10px 14px 14px;
+      background: linear-gradient(to top, rgba(5,5,8,.98) 60%, transparent);
+      backdrop-filter: blur(18px);
+      border-top: 1px solid var(--border-dim); z-index: 10;
+    }
+    .btn {
+      cursor: pointer; padding: 7px 13px;
+      border: 1px solid var(--border-dim); border-radius: 6px;
+      color: var(--muted); font: 500 10px/1 var(--font-ui);
+      letter-spacing: 1.5px; text-transform: uppercase;
+      background: rgba(255,255,255,0.03);
+      transition: all var(--t-fast) var(--ease); user-select: none;
+    }
+    .btn:hover {
+      color: var(--text); border-color: rgba(255,255,255,.2);
+      background: rgba(255,255,255,.06);
+      transform: translateY(-1px);
+    }
     .btn.active {
-      color: #fff;
-      border-color: rgba(255,255,255,0.65);
-      background: rgba(255,255,255,0.14);
-      box-shadow: 0 0 14px rgba(255,255,255,0.18);
+      color: var(--accent); border-color: var(--accent-dim);
+      background: var(--accent-glow);
+      box-shadow: 0 0 16px rgba(var(--accent-rgb),.12);
     }
 
+    /* ─── SUBBAR FLORES ──────────────────────────────────────────────── */
     #subbar {
-      position: fixed;
-      bottom: 52px; left: 0; right: 0;
-      display: flex;
-      justify-content: center;
-      gap: 6px;
-      padding: 4px 12px;
-      z-index: 10;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity .28s;
+      position: fixed; bottom: 52px; left: 0; right: 0;
+      display: flex; justify-content: center; gap: 5px; padding: 5px 14px;
+      z-index: 10; opacity: 0; pointer-events: none;
+      transform: translateY(8px);
+      transition: opacity var(--t-mid) var(--ease), transform var(--t-mid) var(--ease);
     }
-    #subbar.show { opacity: 1; pointer-events: all; }
-    .fbtn.active {
-      color: #fff;
-      border-color: rgba(255,210,80,0.75) !important;
-      background: rgba(255,210,80,0.1) !important;
-      box-shadow: 0 0 14px rgba(255,210,80,0.25) !important;
+    #subbar.show { opacity: 1; pointer-events: all; transform: translateY(0); }
+    .fbtn {
+      cursor: pointer; padding: 5px 13px;
+      border: 1px solid var(--border); border-radius: 20px;
+      color: var(--muted); font: 500 9px/1 var(--font-ui);
+      letter-spacing: 1.5px; text-transform: uppercase;
+      background: rgba(5,5,8,.88); backdrop-filter: blur(10px);
+      transition: all var(--t-fast) var(--ease); user-select: none;
     }
+    .fbtn:hover { color: var(--text); border-color: rgba(255,255,255,.2); }
+    .fbtn.active { color: var(--accent); border-color: var(--accent-dim); background: var(--accent-glow); }
 
+    /* ─── LOADING ────────────────────────────────────────────────────── */
     #ov {
-      position: fixed; inset: 0;
-      background: #000;
+      position: fixed; inset: 0; background: var(--bg);
       display: flex; flex-direction: column;
-      align-items: center; justify-content: center;
-      gap: 14px; z-index: 20;
-      transition: opacity .7s;
+      align-items: center; justify-content: center; gap: 24px;
+      z-index: 30; transition: opacity .9s var(--ease);
     }
     #ov.gone { opacity: 0; pointer-events: none; }
-    #ov span { color: rgba(255,255,255,0.4); font-size: 13px; letter-spacing: 3px; text-transform: uppercase; }
-    .ring {
-      width: 32px; height: 32px;
-      border: 2px solid rgba(80,180,255,.15);
-      border-top-color: rgba(80,180,255,.85);
-      border-radius: 50%;
+    .ov-brand { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .ov-eye  { font: 600 8px/1 var(--font-ui); letter-spacing: 5px; color: var(--accent); opacity:.6; text-transform:uppercase; }
+    .ov-name { font: 700 36px/1 var(--font-logo); letter-spacing:-1px; color:#fff; }
+    .ov-name em { color: var(--accent); font-style: normal; }
+    .ov-year { font: 300 10px/1 var(--font-ui); letter-spacing: 7px; color: var(--muted); }
+    .spinner {
+      width: 30px; height: 30px;
+      border: 1.5px solid rgba(var(--accent-rgb),.14);
+      border-top-color: var(--accent); border-radius: 50%;
       animation: spin .75s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .ov-txt { font: 500 9px/1 var(--font-ui); letter-spacing: 4px; color: var(--muted); text-transform: uppercase; }
   </style>
 </head>
 <body>
 
-<div id="ov"><div class="ring"></div><span>Cargando</span></div>
+<!-- ─── LOADING ─────────────────────────────────────────────────────── -->
+<div id="ov">
+  <div class="ov-brand">
+    <span class="ov-eye">Universidad Privada de Santa Cruz</span>
+    <span class="ov-name">Promo<em>UPSA</em></span>
+    <span class="ov-year">2 0 2 6</span>
+  </div>
+  <div class="spinner"></div>
+  <span class="ov-txt">Iniciando cámara</span>
+</div>
+
+<!-- ─── CANVAS + VIDEO ─────────────────────────────────────────────── -->
 <canvas id="c"></canvas>
 <video  id="v" autoplay playsinline muted></video>
-<div    id="subbar"></div>
-<div    id="bar"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"
-        crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
-        crossorigin="anonymous"></script>
+<!-- ─── LOGO ─────────────────────────────────────────────────────────── -->
+<div id="logo">
+  <div class="logo-wrap">
+    <span class="logo-eyebrow">Universidad Privada de Santa Cruz</span>
+    <span class="logo-title">Promo<em>UPSA</em></span>
+    <span class="logo-sub">2 0 2 6 &nbsp;·&nbsp; Ing. de Sistemas</span>
+  </div>
+</div>
+
+<!-- ─── CAM TOGGLE ────────────────────────────────────────────────────── -->
+<div id="cam-toggle">
+  <div class="cbtn active" data-cam="color">Color</div>
+  <div class="cbtn" data-cam="bw">B&amp;W</div>
+  <div class="cbtn" data-cam="none">None</div>
+</div>
+
+<!-- ─── UI BARS ───────────────────────────────────────────────────────── -->
+<div id="subbar"></div>
+<div id="bar"></div>
+
+<!-- ─── MEDIAPIPE CDN ─────────────────────────────────────────────────── -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"              crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
 
 <script>
+/* ════════════════════════════════════════════════════════════════════════
+   GLOBALS
+════════════════════════════════════════════════════════════════════════ */
 'use strict';
 
-/* ═══════════════════════════════════════════════════════════════
-   SETUP
-═══════════════════════════════════════════════════════════════ */
 const c   = document.getElementById('c');
 const ctx = c.getContext('2d');
 const vid = document.getElementById('v');
-const bar = document.getElementById('bar');
 const ov  = document.getElementById('ov');
+const bar = document.getElementById('bar');
+const sub = document.getElementById('subbar');
 
 let W = c.width  = window.innerWidth;
 let H = c.height = window.innerHeight;
-let T = 0; // frame counter
+let T = 0;                    // frame counter
+let landmarks   = null;       // flat array de todos los landmarks (coordenadas pantalla)
+let handsData   = [];         // [{landmarks, handedness}] por mano
+let faceData    = [];         // detecciones faciales MediaPipe
+let camMode     = 'color';
+let mode        = 'particles';
 
-let landmarks = null; // [{x,y,z,sx,sy}, ...]
-
-// hand bone connections (MediaPipe topology)
+/* Conexiones del esqueleto de mano (21 landmarks MediaPipe) */
 const CONN = [
-  [0,1],[1,2],[2,3],[3,4],
-  [0,5],[5,6],[6,7],[7,8],
-  [0,9],[9,10],[10,11],[11,12],
-  [0,13],[13,14],[14,15],[15,16],
-  [0,17],[17,18],[18,19],[19,20],
-  [5,9],[9,13],[13,17]
+  [0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],
+  [0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],
+  [0,17],[17,18],[18,19],[19,20],[5,9],[9,13],[13,17]
 ];
 
-/* ═══════════════════════════════════════════════════════════════
-   MODES
-═══════════════════════════════════════════════════════════════ */
+/* Color UPSA en distintos contextos */
+const A = '91,181,58';        // --accent-rgb
+const ACCENT = '#5bb53a';
+
 const MODE_LIST = [
-  { id:'particles', label:'① Particles' },
-  { id:'garden',    label:'② Garden'    },
-  { id:'skeleton',  label:'③ Skeleton'  },
-  { id:'mirror',    label:'④ Mirror'    },
-  { id:'fire',      label:'⑤ Fire'      },
-  { id:'matrix',    label:'⑥ Matrix'    },
-  { id:'binary',    label:'⑦ Binary'    },
+  {id:'particles', label:'Particles'},
+  {id:'garden',    label:'Garden'},
+  {id:'face',      label:'Face'},
+  {id:'twohands',  label:'Two Hands'},
+  {id:'binary',    label:'Binary'},
+  {id:'circuit',   label:'Circuit'},
+  {id:'wireframe', label:'Wireframe'},
+  {id:'soundwave', label:'Sound Wave'},
+  {id:'hacker',    label:'Hacker'},
+  {id:'aiscan',    label:'AI Scan'},
+  {id:'game',      label:'Game'},
+  {id:'robotarm',  label:'Robot Arm'},
+  {id:'dna',       label:'DNA'},
+  {id:'network',   label:'Network'},
 ];
-let mode = 'particles';
+const CAM_MODES = ['color','bw','none'];
 
-/* ═══════════════════════════════════════════════════════════════
-   SHARED WATERMARK
-═══════════════════════════════════════════════════════════════ */
-function drawWatermark(alpha) {
-  const a = alpha || 0.08;
-  const cx = W/2, cy = H/2;
-  const fs1 = Math.min(W/8.5, 115);
-  const fs2 = Math.min(W/5.5, 175);
-  ctx.save();
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.shadowBlur = 40;
-  ctx.shadowColor = `rgba(120,200,255,${a*3})`;
-  ctx.fillStyle   = `rgba(200,230,255,${a})`;
-  ctx.font = `900 ${fs1}px Arial`;
-  ctx.fillText('PromoUPSA', cx, cy - fs1*0.82);
-  ctx.font = `900 ${fs2}px Arial`;
-  ctx.fillText('2026', cx, cy + fs2*0.52);
-  ctx.restore();
+/* ════════════════════════════════════════════════════════════════════════
+   UTILIDADES
+════════════════════════════════════════════════════════════════════════ */
+
+/** Centro de la palma: promedio de muñeca + 4 bases de dedos */
+function palmCenter(lms) {
+  let x=0, y=0;
+  [0,5,9,13,17].forEach(i=>{ x+=lms[i].sx; y+=lms[i].sy; });
+  return { x:x/5, y:y/5 };
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   MODE 1 — PARTICLES
-   3000 partículas forman "PromoUPSA 2026", huyen de la mano
-═══════════════════════════════════════════════════════════════ */
-const PCOUNT = 3000;
+/** Apertura de mano [0..1]: 0=cerrada, 1=completamente abierta */
+function measureOpen(lms) {
+  const c = palmCenter(lms);
+  const ref = Math.hypot(lms[9].sx-lms[0].sx, lms[9].sy-lms[0].sy) || 100;
+  let d = 0;
+  [4,8,12,16,20].forEach(i => d += Math.hypot(lms[i].sx-c.x, lms[i].sy-c.y));
+  return Math.max(0, Math.min(1, (d/5/ref - 0.55)/1.65));
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 1 — PARTICLES
+   Partículas forman "PromoUPSA 2026"; la mano las dispersa.
+════════════════════════════════════════════════════════════════════════ */
+const PCOUNT = 2600;
 let particles = [];
 
 function Particle(hx, hy, isText) {
   this.hx = hx; this.hy = hy;
-  this.x  = Math.random() * W;
-  this.y  = Math.random() * H;
+  this.x = Math.random()*W; this.y = Math.random()*H;
   this.vx = 0; this.vy = 0;
   if (isText) {
-    this.r      = 1.2 + Math.random() * 2.2;
-    this.alpha  = 0.8 + Math.random() * 0.2;
-    this.baseH  = Math.random() < 0.55 ? 200 + Math.random()*50 : 38 + Math.random()*18;
-    this.spring = 0.055;
-    this.rR = 145; this.rStr = 11;
+    this.r      = 1.4 + Math.random()*1.1;
+    this.alpha  = 0.72 + Math.random()*0.28;
+    this.spring = 0.048;
+    this.repR   = 140; this.repStr = 15;
+    this.useAccent = Math.random() < 0.55;
   } else {
-    this.r      = 0.3 + Math.random() * 1;
-    this.alpha  = 0.04 + Math.random() * 0.14;
-    this.baseH  = 195 + Math.random() * 65;
-    this.spring = 0.006;
-    this.rR = 70; this.rStr = 3;
+    this.r      = 0.7 + Math.random()*0.8;
+    this.alpha  = 0.04 + Math.random()*0.09;
+    this.spring = 0.005;
+    this.repR   = 85;  this.repStr = 4;
+    this.useAccent = true;
   }
-  this.h = this.baseH;
-  this.lit = 65;
 }
 
 Particle.prototype.update = function() {
   this.vx += (this.hx - this.x) * this.spring;
   this.vy += (this.hy - this.y) * this.spring;
-  let push = 0;
   if (landmarks) {
-    for (let i = 0; i < landmarks.length; i++) {
-      const lm = landmarks[i];
-      const dx = this.x - lm.sx, dy = this.y - lm.sy;
-      const d2 = dx*dx + dy*dy;
-      if (d2 < this.rR*this.rR && d2 > 0.01) {
-        const d = Math.sqrt(d2), f = (this.rR-d)/this.rR;
-        this.vx += (dx/d)*f*this.rStr;
-        this.vy += (dy/d)*f*this.rStr;
-        if (f > push) push = f;
+    for (let i=0; i<landmarks.length; i++) {
+      const lm=landmarks[i];
+      const dx=this.x-lm.sx, dy=this.y-lm.sy, d2=dx*dx+dy*dy;
+      if (d2 < this.repR*this.repR && d2 > 0.01) {
+        const d=Math.sqrt(d2), f=(this.repR-d)/this.repR;
+        this.vx += (dx/d)*f*this.repStr;
+        this.vy += (dy/d)*f*this.repStr;
       }
     }
   }
-  const tH = push > 0 ? this.baseH - push*160 : this.baseH;
-  const tL = push > 0 ? 65 + push*35           : 65;
-  this.h   += (tH - this.h)   * 0.1;
-  this.lit += (tL - this.lit) * 0.1;
-  this.vx *= 0.86; this.vy *= 0.86;
-  this.x  += this.vx; this.y  += this.vy;
+  this.vx *= 0.87; this.vy *= 0.87;
+  this.x  += this.vx; this.y += this.vy;
 };
 
 Particle.prototype.draw = function() {
+  const col = this.useAccent ? A : '255,255,255';
   ctx.beginPath();
-  ctx.arc(this.x, this.y, this.r*3.5, 0, 6.2832);
-  ctx.fillStyle = `hsla(${this.h},100%,${this.lit}%,${this.alpha*0.13})`;
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(this.x, this.y, this.r, 0, 6.2832);
-  ctx.fillStyle = `hsla(${this.h},100%,${this.lit+10}%,${this.alpha})`;
+  ctx.arc(this.x, this.y, this.r, 0, Math.PI*2);
+  ctx.fillStyle = `rgba(${col},${this.alpha})`;
   ctx.fill();
 };
 
+/** Muestrea píxeles del texto renderizado en offscreen canvas */
 function sampleText() {
   const off = document.createElement('canvas');
   off.width = W; off.height = H;
-  const o   = off.getContext('2d');
-  const cx  = W/2, cy = H/2;
-  const fs1 = Math.min(W/8.5, 115);
-  const fs2 = Math.min(W/5.5, 175);
-  o.textAlign = 'center'; o.textBaseline = 'middle'; o.fillStyle = '#fff';
-  o.font = `900 ${fs1}px Arial`; o.fillText('PromoUPSA', cx, cy - fs1*0.82);
-  o.font = `900 ${fs2}px Arial`; o.fillText('2026',      cx, cy + fs2*0.52);
-  const px   = o.getImageData(0, 0, W, H).data;
-  const step = Math.max(3, Math.floor(Math.sqrt(W*H/45000)));
-  const out  = [];
-  for (let y = 0; y < H; y += step)
-    for (let x = 0; x < W; x += step)
-      if (px[(y*W+x)*4+3] > 128) out.push(x, y);
-  for (let i = out.length/2-1; i > 0; i--) {
-    const j = (Math.random()*(i+1))|0;
-    const tx = out[i*2], ty = out[i*2+1];
-    out[i*2] = out[j*2]; out[i*2+1] = out[j*2+1];
-    out[j*2] = tx;       out[j*2+1] = ty;
+  const o = off.getContext('2d');
+  const topOff=115, botOff=62;
+  const cx=W/2, cy=topOff+(H-topOff-botOff)/2;
+  const fs1=Math.min(W/7,108), fs2=Math.min(W/4.5,148);
+  o.textAlign='center'; o.textBaseline='middle'; o.fillStyle='#fff';
+  o.font=`700 ${fs1}px 'Space Grotesk',sans-serif`; o.fillText('PromoUPSA',cx,cy-fs1*.72);
+  o.font=`700 ${fs2}px 'Space Grotesk',sans-serif`; o.fillText('2026',cx,cy+fs2*.55);
+  const px=o.getImageData(0,0,W,H).data;
+  const step=Math.max(3,Math.floor(Math.sqrt(W*H/50000)));
+  const out=[];
+  for (let y=0;y<H;y+=step) for (let x=0;x<W;x+=step)
+    if (px[(y*W+x)*4+3]>128) out.push(x,y);
+  /* Fisher-Yates shuffle para distribución aleatoria */
+  for (let i=out.length/2-1;i>0;i--) {
+    const j=(Math.random()*(i+1))|0;
+    const tx=out[i*2], ty=out[i*2+1];
+    out[i*2]=out[j*2]; out[i*2+1]=out[j*2+1];
+    out[j*2]=tx; out[j*2+1]=ty;
   }
   return out;
 }
 
 function initParticles() {
-  const pts   = sampleText();
-  const textN = Math.min((PCOUNT*0.75)|0, pts.length/2);
-  particles   = new Array(PCOUNT);
-  for (let i = 0; i < PCOUNT; i++)
-    particles[i] = i < textN
-      ? new Particle(pts[i*2], pts[i*2+1], true)
-      : new Particle(Math.random()*W, Math.random()*H, false);
+  const pts=sampleText();
+  const textN=Math.min((PCOUNT*.76)|0, pts.length/2);
+  particles=new Array(PCOUNT);
+  for (let i=0;i<PCOUNT;i++)
+    particles[i]=i<textN
+      ? new Particle(pts[i*2],pts[i*2+1],true)
+      : new Particle(Math.random()*W,Math.random()*H,false);
 }
 
 function renderParticles() {
-  drawWatermark(0.11);
-  ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < particles.length; i++) {
-    particles[i].update();
-    particles[i].draw();
-  }
-  ctx.globalCompositeOperation = 'source-over';
+  ctx.save();
+  ctx.globalCompositeOperation='lighter';
+  particles.forEach(p=>{ p.update(); p.draw(); });
+  ctx.restore();
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   MODE 2 — GARDEN
-   Flor en la palma reacciona a la apertura de la mano
-   Puño = capullo cerrado · Abriendo = pétalos uno a uno · Abierta = plena floración
-═══════════════════════════════════════════════════════════════ */
-let gardenOpen = [0, 0]; // apertura suavizada por mano (hasta 2)
-
-/* Devuelve 0 (puño) → 1 (mano abierta)
-   Métrica: distancia promedio yemas↔centro palma, normalizada por tamaño de mano */
-function measureOpen(lms) {
-  let pcx = 0, pcy = 0;
-  [0, 5, 9, 13, 17].forEach(i => { pcx += lms[i].sx; pcy += lms[i].sy; });
-  pcx /= 5; pcy /= 5;
-  const ref = Math.hypot(lms[9].sx - lms[0].sx, lms[9].sy - lms[0].sy) || 100;
-  let d = 0;
-  [4, 8, 12, 16, 20].forEach(i => d += Math.hypot(lms[i].sx - pcx, lms[i].sy - pcy));
-  return Math.max(0, Math.min(1, (d/5/ref - 0.55) / 1.65));
-}
-
-/* Dibuja un pétalo (bezier de doble curva) desde (cx,cy) en dirección angle */
-function drawPetal(cx, cy, angle, len, width, hue, alpha) {
-  const tx   = cx + Math.cos(angle)*len;
-  const ty   = cy + Math.sin(angle)*len;
-  const perp = angle + Math.PI/2;
-  const m    = 0.52;
-  const cp1x = cx + Math.cos(angle)*len*m + Math.cos(perp)*width;
-  const cp1y = cy + Math.sin(angle)*len*m + Math.sin(perp)*width;
-  const cp2x = cx + Math.cos(angle)*len*m - Math.cos(perp)*width;
-  const cp2y = cy + Math.sin(angle)*len*m - Math.sin(perp)*width;
-
-  ctx.beginPath();
-  ctx.moveTo(cx, cy);
-  ctx.bezierCurveTo(cp1x, cp1y, tx, ty, tx, ty);
-  ctx.bezierCurveTo(cp2x, cp2y, cx, cy, cx, cy);
-  ctx.fillStyle   = `hsla(${hue},90%,65%,${alpha})`;
-  ctx.fill();
-  ctx.strokeStyle = `hsla(${hue+28},100%,88%,${alpha*0.4})`;
-  ctx.lineWidth   = 0.6;
-  ctx.stroke();
-}
-
-/* Tipos de flor */
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 2 — GARDEN
+   Planta central con flor que responde a la apertura de la mano.
+   Escala grande (~34% del lado menor de pantalla) para máximo impacto.
+════════════════════════════════════════════════════════════════════════ */
+let gardenOpen = 0;
+let flowerIdx  = 0;
 const FLOWER_DEFS = [
-  { label:'Q · Orquídea' },
-  { label:'W · Gerbera'  },
-  { label:'E · Tajibo 🇧🇴'},
-  { label:'R · Jardín'   },
+  {label:'Orquídea'}, {label:'Gerbera'},
+  {label:'Tajibo'},   {label:'Rosa'},
 ];
-let flowerIdx = 0;
 
-/* Núcleo compartido: estambre, capullo y destellos */
-function flowerCore(cx, cy, open, scale, budHue, sparkHue) {
-  const cr = scale*(0.04+open*0.09);
-  const g  = ctx.createRadialGradient(cx,cy,0,cx,cy,cr*2.8);
-  g.addColorStop(0,   `hsla(55,100%,98%,${0.65+open*0.35})`);
-  g.addColorStop(0.4, `hsla(44,100%,78%,${0.45+open*0.45})`);
-  g.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.beginPath(); ctx.arc(cx,cy,cr*2.8,0,6.2832); ctx.fillStyle=g; ctx.fill();
-
-  if (open < 0.32) {
-    const bt=1-open/0.32;
-    ctx.beginPath();
-    ctx.ellipse(cx,cy-scale*0.09*bt,scale*0.1*bt,scale*0.22*bt,0,0,6.2832);
-    ctx.fillStyle=`hsla(${budHue},70%,28%,${0.55*bt})`;
-    ctx.strokeStyle=`hsla(${budHue+15},80%,52%,${0.7*bt})`;
-    ctx.lineWidth=1.2; ctx.fill(); ctx.stroke();
-    for (let s=0;s<3;s++) {
-      const sa=s/3*Math.PI*2-Math.PI/2+0.3;
-      ctx.beginPath();
-      ctx.moveTo(cx,cy+scale*0.05*bt);
-      ctx.quadraticCurveTo(
-        cx+Math.cos(sa)*scale*0.14*bt,cy+Math.sin(sa)*scale*0.14*bt,
-        cx+Math.cos(sa)*scale*0.06*bt,cy+Math.sin(sa)*scale*0.06*bt-scale*0.12*bt
-      );
-      ctx.strokeStyle=`hsla(${budHue},80%,45%,${0.55*bt})`; ctx.lineWidth=1.5; ctx.stroke();
-    }
-  }
-  if (open > 0.85) {
-    const a=(open-0.85)/0.15;
-    for (let s=0;s<14;s++) {
-      const sa=s/14*Math.PI*2+T*0.014;
-      const sr=scale*(0.78+Math.sin(T*0.055+s)*0.18);
-      ctx.beginPath(); ctx.arc(cx+Math.cos(sa)*sr,cy+Math.sin(sa)*sr,1.8,0,6.2832);
-      ctx.fillStyle=`hsla(${sparkHue},100%,90%,${a*0.88})`; ctx.fill();
-    }
-  }
+/**
+ * Dibuja un pétalo con bezier curves elegantes.
+ * @param {number} cx,cy  — centro base del pétalo
+ * @param {number} angle  — ángulo de crecimiento (radianes)
+ * @param {number} len    — longitud del pétalo
+ * @param {number} width  — anchura máxima
+ * @param {string} colStr — "R,G,B"
+ * @param {number} alpha  — opacidad stroke [0..1]
+ */
+function drawPetal(cx, cy, angle, len, width, colStr, alpha) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.bezierCurveTo( width*.85, -len*.18,  width,   -len*.78,  0, -len);
+  ctx.bezierCurveTo(-width,     -len*.78, -width*.85,-len*.18,  0,  0);
+  ctx.closePath();
+  ctx.fillStyle   = `rgba(${colStr},${alpha*.12})`;
+  ctx.fill();
+  ctx.strokeStyle = `rgba(${colStr},${alpha})`;
+  ctx.lineWidth   = 0.9;
+  ctx.shadowColor = `rgba(${colStr},${alpha*.35})`;
+  ctx.shadowBlur  = 8;
+  ctx.stroke();
+  ctx.restore();
 }
 
-/* ── ORQUÍDEA: magenta, blanco, púrpura ── */
-function drawOrchid(cx, cy, open, scale) {
-  // sépalo dorsal (arriba)
-  const s0=Math.min(1,open/0.7);
-  if (s0>0.01) drawPetal(cx,cy,-Math.PI/2,scale*(0.06+s0*0.88),scale*(0.013+s0*0.17),290,0.15+s0*0.75);
-  // 2 pétalos ala (más grandes, los más laterales)
-  const wings=[[-Math.PI/2+1.1],[-Math.PI/2-1.1]];
-  wings.forEach(([ang],i)=>{
-    const s=Math.max(0,Math.min(1,(open-0.08)*1.25));
-    if (s<0.01) return;
-    drawPetal(cx,cy,ang,scale*(0.05+s*1.05),scale*(0.025+s*0.42),i?295:308,0.12+s*0.78);
-  });
-  // 2 sépalos laterales inferiores (estrechos)
-  [Math.PI/2+0.52,Math.PI/2-0.52].forEach(ang=>{
-    const s=Math.max(0,Math.min(1,(open-0.05)*1.2));
-    if (s<0.01) return;
-    drawPetal(cx,cy,ang,scale*(0.04+s*0.65),scale*(0.007+s*0.09),280,0.1+s*0.52);
-  });
-  // labellum (labio — más ancho, blanco con magenta)
-  const sl=Math.max(0,Math.min(1,(open-0.15)*1.2));
-  if (sl>0.01) {
-    drawPetal(cx,cy,Math.PI/2,scale*(0.05+sl*0.9),scale*(0.032+sl*0.44),318,0.15+sl*0.68);
-    drawPetal(cx,cy,Math.PI/2,scale*(0.03+sl*0.55),scale*(0.018+sl*0.26),350,0.18+sl*0.72);
+/* ── ORQUÍDEA ── */
+function drawOrchid(cx, cy, open, sc) {
+  if (open < 0.04) {                         /* capullo cerrado */
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.beginPath(); ctx.ellipse(0,-sc*.12,sc*.055,sc*.16,0,0,Math.PI*2);
+    ctx.strokeStyle='rgba(215,190,245,0.65)'; ctx.lineWidth=0.9; ctx.stroke();
+    ctx.restore(); return;
   }
-  flowerCore(cx,cy,open,scale,130,310);
+  /* pétalo dorsal superior */
+  drawPetal(cx,cy,-Math.PI/2, sc*(.1+open*.95), sc*(.045+open*.28), '220,200,248', open*.9);
+  /* 2 pétalos laterales */
+  [-Math.PI/2+1.0, -Math.PI/2-1.0].forEach((a,i) => {
+    const s=Math.max(0,Math.min(1,(open-.1)*1.25)); if(s<.01)return;
+    drawPetal(cx,cy,a, sc*(.08+s*1.1), sc*(.05+s*.38), i?'200,178,235':'218,198,245', s*.88);
+  });
+  /* 2 sépalos pequeños */
+  [Math.PI/2+.48, Math.PI/2-.48].forEach(a => {
+    const s=Math.max(0,Math.min(1,(open-.05)*1.3)); if(s<.01)return;
+    drawPetal(cx,cy,a, sc*(.05+s*.6), sc*(.015+s*.08), '175,155,220', s*.62);
+  });
+  /* labelo (pétalo inferior característico) */
+  const sl=Math.max(0,Math.min(1,(open-.12)*1.2));
+  if (sl>.01) drawPetal(cx,cy,Math.PI/2, sc*(.08+sl*.92), sc*(.06+sl*.48), '238,218,255', sl*.92);
+  /* núcleo */
+  ctx.save(); ctx.translate(cx,cy);
+  ctx.beginPath(); ctx.arc(0,0,sc*(.025+open*.08),0,Math.PI*2);
+  ctx.strokeStyle=`rgba(245,225,255,${.4+open*.5})`; ctx.lineWidth=0.8; ctx.shadowBlur=12; ctx.stroke();
+  ctx.restore();
 }
 
-/* ── GERBERA: naranja, amarillo, rojo ── */
-function drawGerbera(cx, cy, open, scale) {
-  // anillo exterior: 20 pétalos finos
+/* ── GERBERA ── */
+function drawGerbera(cx, cy, open, sc) {
+  if (open < 0.04) {
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.beginPath(); ctx.ellipse(0,-sc*.1,sc*.05,sc*.13,0,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,205,140,0.65)'; ctx.lineWidth=0.9; ctx.stroke();
+    ctx.restore(); return;
+  }
+  /* 20 pétalos exteriores */
   for (let p=0;p<20;p++) {
-    const st=(p/20)*0.15, s=open<=st?0:Math.min(1,(open-st)/(1-st));
-    if (s<0.01) continue;
-    drawPetal(cx,cy,(p/20)*Math.PI*2+T*0.002,scale*(0.06+s*0.98),scale*(0.007+s*0.088),18+p*3,0.2+s*0.72);
+    const st=(p/20)*.15, s=open<=st?0:Math.min(1,(open-st)/(1-st)); if(s<.01)continue;
+    drawPetal(cx,cy,(p/20)*Math.PI*2, sc*(.14+s*.9), sc*(.02+s*.092), '255,205,110', s*.82);
   }
-  // anillo interior: 12 pétalos amarillos
+  /* 12 pétalos interiores */
   for (let p=0;p<12;p++) {
-    const st=0.13+(p/12)*0.13, s=open<=st?0:Math.min(1,(open-st)/(1-st));
-    if (s<0.01) continue;
-    drawPetal(cx,cy,(p/12)*Math.PI*2+Math.PI/12+T*0.003,scale*(0.04+s*0.58),scale*(0.006+s*0.068),42+p*4,0.25+s*0.65);
+    const st=.15+(p/12)*.12, s=open<=st?0:Math.min(1,(open-st)/(1-st)); if(s<.01)continue;
+    drawPetal(cx,cy,(p/12)*Math.PI*2+Math.PI/12, sc*(.09+s*.54), sc*(.016+s*.068), '255,158,70', s*.74);
   }
-  // disco central oscuro
-  if (open>0.05) {
-    const dr=scale*(0.07+open*0.1);
-    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,dr);
-    g.addColorStop(0,`rgba(55,12,0,${0.55+open*0.4})`);
-    g.addColorStop(0.7,`rgba(95,28,0,${0.4+open*0.35})`);
-    g.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.beginPath(); ctx.arc(cx,cy,dr,0,6.2832); ctx.fillStyle=g; ctx.fill();
+  /* disco central */
+  if (open > .05) {
+    const dr=sc*(.055+open*.11);
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.beginPath(); ctx.arc(0,0,dr,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(210,92,38,${.4+open*.5})`; ctx.lineWidth=0.8; ctx.shadowBlur=8; ctx.stroke();
+    ctx.restore();
   }
-  flowerCore(cx,cy,open,scale,25,40);
 }
 
-/* ── TAJIBO: amarillo intenso, dorado (flor nacional de Bolivia) ── */
-function drawTajibo(cx, cy, open, scale) {
+/* ── TAJIBO (árbol nacional de Bolivia) ── */
+function drawTajibo(cx, cy, open, sc) {
+  if (open < 0.04) {
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.beginPath(); ctx.ellipse(0,-sc*.1,sc*.055,sc*.14,0,0,Math.PI*2);
+    ctx.strokeStyle='rgba(185,148,228,0.65)'; ctx.lineWidth=0.9; ctx.stroke();
+    ctx.restore(); return;
+  }
+  /* 5 pétalos acampanados (trompeta) característicos */
   for (let p=0;p<5;p++) {
-    const st=(p/5)*0.2, s=open<=st?0:Math.min(1,(open-st)/(1-st));
-    if (s<0.01) continue;
-    const ang=(p/5)*Math.PI*2-Math.PI/2+T*0.005;
-    const len=scale*(0.07+s*1.08), wid=scale*(0.03+s*0.44);
-    const hue=44+p*3+Math.sin(T*0.03+p)*4;
-    const tx=cx+Math.cos(ang)*len, ty=cy+Math.sin(ang)*len;
-    const perp=ang+Math.PI/2, m=0.52;
-    const cp1x=cx+Math.cos(ang)*len*m+Math.cos(perp)*wid, cp1y=cy+Math.sin(ang)*len*m+Math.sin(perp)*wid;
-    const cp2x=cx+Math.cos(ang)*len*m-Math.cos(perp)*wid, cp2y=cy+Math.sin(ang)*len*m-Math.sin(perp)*wid;
-    ctx.beginPath(); ctx.moveTo(cx,cy);
-    ctx.bezierCurveTo(cp1x,cp1y,tx,ty,tx,ty);
-    ctx.bezierCurveTo(cp2x,cp2y,cx,cy,cx,cy);
-    ctx.fillStyle=`hsla(${hue},97%,${72+s*18}%,${0.2+s*0.78})`; ctx.fill();
-    ctx.strokeStyle=`hsla(${hue-8},100%,92%,${s*0.35})`; ctx.lineWidth=0.7; ctx.stroke();
-    if (s>0.3) { // vena central
-      ctx.beginPath(); ctx.moveTo(cx,cy); ctx.lineTo(tx,ty);
-      ctx.strokeStyle=`hsla(${hue+10},100%,97%,${(s-0.3)*0.3})`; ctx.lineWidth=0.5; ctx.stroke();
+    const st=(p/5)*.18, s=open<=st?0:Math.min(1,(open-st)/(1-st)); if(s<.01)continue;
+    const ang=(p/5)*Math.PI*2-Math.PI/2;
+    ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+    const len=sc*(.18+s*1.02), w=sc*(.1+s*.42);
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.bezierCurveTo( w*.55,-len*.15,  w*1.08,-len*.52,  w*.68,-len);
+    ctx.bezierCurveTo( w*.28,-len*1.1, -w*.28,-len*1.1, -w*.68,-len);
+    ctx.bezierCurveTo(-w*1.08,-len*.52, -w*.55,-len*.15,  0, 0);
+    ctx.closePath();
+    ctx.fillStyle  =`rgba(178,128,225,${s*.1})`; ctx.fill();
+    ctx.strokeStyle=`rgba(205,162,248,${s*.9})`; ctx.lineWidth=0.9;
+    ctx.shadowColor=`rgba(180,132,232,${s*.3})`; ctx.shadowBlur=8;
+    ctx.stroke(); ctx.restore();
+  }
+  ctx.save(); ctx.translate(cx,cy);
+  ctx.beginPath(); ctx.arc(0,0,sc*(.04+open*.07),0,Math.PI*2);
+  ctx.strokeStyle=`rgba(228,188,255,${.5+open*.4})`; ctx.lineWidth=0.8; ctx.shadowBlur=10; ctx.stroke();
+  ctx.restore();
+}
+
+/* ── ROSA ── */
+function drawRosa(cx, cy, open, sc) {
+  if (open < 0.04) {
+    ctx.save(); ctx.translate(cx,cy);
+    ctx.beginPath(); ctx.arc(0,0,sc*.08,0,Math.PI*2);
+    ctx.strokeStyle='rgba(255,178,178,0.65)'; ctx.lineWidth=0.9; ctx.stroke();
+    ctx.restore(); return;
+  }
+  /* 4 capas de pétalos en espiral */
+  for (let layer=0;layer<4;layer++) {
+    const lOpen=Math.max(0,Math.min(1,(open-layer*.22)/(1-layer*.22))); if(lOpen<.01)continue;
+    const n=5+layer*3;
+    const len=sc*(.12+lOpen*.26)*(1+layer*.56);
+    const w  =sc*(.05+lOpen*.15)*(1+layer*.32);
+    const rot=(layer*Math.PI)/n+T*.001;
+    for (let p=0;p<n;p++) {
+      const ang=(p/n)*Math.PI*2+rot;
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(ang);
+      const off=sc*.015*layer;
+      ctx.beginPath();
+      ctx.moveTo(0,-off);
+      ctx.bezierCurveTo( w,-len*.28,  w*.9,-len*.84,  0,-len);
+      ctx.bezierCurveTo(-w*.9,-len*.84, -w,-len*.28,  0,-off);
+      ctx.closePath();
+      const lv=148+layer*18;
+      ctx.fillStyle  =`rgba(255,${lv},${lv},${lOpen*.1+.04})`; ctx.fill();
+      ctx.strokeStyle=`rgba(255,${lv+18},${lv+10},${lOpen*.8})`; ctx.lineWidth=0.85;
+      ctx.shadowColor=`rgba(255,162,162,${lOpen*.25})`; ctx.shadowBlur=5;
+      ctx.stroke(); ctx.restore();
     }
   }
-  flowerCore(cx,cy,open,scale,80,50);
+  ctx.save(); ctx.translate(cx,cy);
+  ctx.beginPath(); ctx.arc(0,0,sc*(.03+open*.055),0,Math.PI*2);
+  ctx.strokeStyle=`rgba(255,200,200,${.5+open*.4})`; ctx.lineWidth=0.8; ctx.shadowBlur=8; ctx.stroke();
+  ctx.restore();
 }
 
-/* ── JARDÍN GENÉRICA: cyan, blanco ── */
-function drawGardenFlower(cx, cy, open, scale) {
-  // 12 pétalos exteriores cyan
-  for (let p=0;p<12;p++) {
-    const st=(p/12)*0.13, s=open<=st?0:Math.min(1,(open-st)/(1-st));
-    if (s<0.01) continue;
-    drawPetal(cx,cy,(p/12)*Math.PI*2-Math.PI/2+T*0.003,scale*(0.06+s*0.98),scale*(0.014+s*0.21),178+p*7,0.18+s*0.74);
+function drawFlower(cx, cy, open, sc) {
+  switch(flowerIdx) {
+    case 0: drawOrchid (cx,cy,open,sc); break;
+    case 1: drawGerbera(cx,cy,open,sc); break;
+    case 2: drawTajibo (cx,cy,open,sc); break;
+    case 3: drawRosa   (cx,cy,open,sc); break;
   }
-  // 8 pétalos interiores blancos
-  for (let p=0;p<8;p++) {
-    const st=0.17+(p/8)*0.17, s=open<=st?0:Math.min(1,(open-st)/(1-st));
-    if (s<0.01) continue;
-    drawPetal(cx,cy,(p/8)*Math.PI*2-Math.PI/2+Math.PI/8+T*0.006,scale*(0.03+s*0.58),scale*(0.01+s*0.13),200,0.2+s*0.65);
+}
+
+/** Tallo con hojas, desde fondo de pantalla hacia la flor */
+function drawStem(fx, fy) {
+  ctx.save();
+  ctx.strokeStyle='rgba(150,200,140,0.22)'; ctx.lineWidth=1.6;
+  ctx.beginPath();
+  ctx.moveTo(W/2, H);
+  ctx.bezierCurveTo(W/2+28, H*.64, fx-22, fy+120, fx, fy);
+  ctx.stroke();
+  const mx=W/2+(fx-W/2)*.4, my=H*.65;
+  ctx.strokeStyle='rgba(130,190,120,0.18)'; ctx.lineWidth=0.9;
+  ctx.beginPath(); ctx.moveTo(mx,my); ctx.bezierCurveTo(mx+34,my-24,mx+55,my-9,mx+44,my+8); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx,my); ctx.bezierCurveTo(mx-34,my-24,mx-55,my-9,mx-44,my+8); ctx.stroke();
+  ctx.restore();
+}
+
+/** Destellos cuando la flor está completamente abierta */
+function drawSparkles(cx, cy, open, sc) {
+  if (open < 0.8) return;
+  const a=(open-.8)/.2;
+  ctx.save();
+  ctx.shadowColor='rgba(255,255,255,.7)'; ctx.shadowBlur=8;
+  ctx.fillStyle=`rgba(255,255,255,${a*.8})`;
+  for (let s=0;s<16;s++) {
+    const sa=s/16*Math.PI*2+T*.022;
+    const sr=sc*(.92+Math.sin(T*.06+s)*.14);
+    ctx.beginPath(); ctx.arc(cx+Math.cos(sa)*sr, cy+Math.sin(sa)*sr, 2, 0, Math.PI*2); ctx.fill();
   }
-  flowerCore(cx,cy,open,scale,160,185);
-}
-
-/* Dispatcher */
-function drawFlower(cx, cy, open, scale) {
-  if      (flowerIdx===0) drawOrchid(cx,cy,open,scale);
-  else if (flowerIdx===1) drawGerbera(cx,cy,open,scale);
-  else if (flowerIdx===2) drawTajibo(cx,cy,open,scale);
-  else                    drawGardenFlower(cx,cy,open,scale);
-}
-
-/* Zarcillos sutiles desde las yemas */
-function tendril(x, y, angle, len, depth, hue) {
-  if (depth <= 0 || len < 3) return;
-  const ex = x + Math.cos(angle + Math.sin(T*0.018+depth)*0.28)*len;
-  const ey = y + Math.sin(angle + Math.sin(T*0.018+depth)*0.28)*len;
-  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(ex, ey);
-  ctx.strokeStyle = `hsla(${hue+depth*14},80%,55%,${depth/4*0.65})`;
-  ctx.lineWidth   = depth*0.5; ctx.lineCap = 'round'; ctx.stroke();
-  tendril(ex, ey, angle - 0.38, len*0.67, depth-1, hue);
-  tendril(ex, ey, angle + 0.38, len*0.67, depth-1, hue);
+  /* halo verde UPSA */
+  ctx.globalAlpha=a*.25;
+  ctx.shadowColor=ACCENT; ctx.shadowBlur=40;
+  ctx.strokeStyle=ACCENT; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(cx,cy,sc*1.1,0,Math.PI*2); ctx.stroke();
+  ctx.restore();
 }
 
 function renderGarden() {
-  ctx.globalCompositeOperation = 'lighter';
+  const fx=W/2, fy=H*.37;
+  /* Escala grande: 34% del lado menor de pantalla → flores imponentes */
+  const sc=Math.min(W,H)*.34;
 
-  if (landmarks) {
-    const handsN = Math.floor(landmarks.length / 21);
-    const tips = [4, 8, 12, 16, 20];
-    const mids = [3, 7, 11, 15, 19];
+  drawStem(fx, fy);
 
-    for (let h = 0; h < handsN; h++) {
-      const lms = landmarks.slice(h*21, (h+1)*21);
-
-      // Medir apertura y suavizar (lerp 12% por frame → transición ~8 frames)
-      const raw = measureOpen(lms);
-      gardenOpen[h] = (gardenOpen[h] || 0) + (raw - (gardenOpen[h] || 0)) * 0.12;
-      const open = gardenOpen[h];
-
-      // Centro de la palma
-      let pcx = 0, pcy = 0;
-      [0, 5, 9, 13, 17].forEach(i => { pcx += lms[i].sx; pcy += lms[i].sy; });
-      pcx /= 5; pcy /= 5;
-
-      // Escala: distancia muñeca→nudillo medio
-      const scale = Math.hypot(lms[9].sx - lms[0].sx, lms[9].sy - lms[0].sy);
-
-      // Zarcillos desde yemas (solo cuando la mano está algo abierta)
-      if (open > 0.15) {
-        tips.forEach((ti, fi) => {
-          const tip = lms[ti], mid = lms[mids[fi]];
-          const ang = Math.atan2(tip.sy-mid.sy, tip.sx-mid.sx) - Math.PI/2;
-          tendril(tip.sx, tip.sy, ang, scale*0.3*open, 4, 80+fi*24);
-        });
-      }
-
-      // Flor centrada en la palma
-      drawFlower(pcx, pcy, open, scale);
-    }
+  let open;
+  if (handsData.length > 0) {
+    const raw=measureOpen(handsData[0].landmarks);
+    gardenOpen += (raw-gardenOpen) * .12;
+    open = gardenOpen;
   } else {
-    // Sin mano: capullo que respira suavemente
-    const breathe = 0.12 + Math.sin(T*0.022)*0.08;
-    drawFlower(W/2, H/2, breathe, 130);
+    /* demo: respiración suave */
+    gardenOpen = .38 + Math.sin(T*.018) * .16;
+    open = gardenOpen;
   }
 
-  ctx.globalCompositeOperation = 'source-over';
-  drawWatermark();
+  drawFlower(fx, fy, open, sc);
+  drawSparkles(fx, fy, open, sc);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   MODE 3 — SKELETON
-   Esqueleto neon muy detallado con glow pulsante
-═══════════════════════════════════════════════════════════════ */
-function renderSkeleton() {
-  if (!landmarks) { drawWatermark(); return; }
-  ctx.globalCompositeOperation = 'lighter';
-  const handsN = Math.floor(landmarks.length/21);
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 3 — FACE DETECTION
+   HUD militar con esquinas estilo seguridad, scan line y datos ficticios.
+════════════════════════════════════════════════════════════════════════ */
+let faceIds    = {};
+let faceScroll = 0;
 
-  for (let h = 0; h < handsN; h++) {
-    const lms = landmarks.slice(h*21, (h+1)*21);
+/**
+ * Dibuja las 4 esquinas estilo HUD/militar alrededor del bounding box.
+ * Cada esquina es una L con el vértice en la esquina real del rectángulo.
+ */
+function drawHUDCorners(bx, by, bw, bh, cs) {
+  ctx.lineWidth = 1.8;
+  /* superior-izquierda */
+  ctx.beginPath(); ctx.moveTo(bx+cs,by); ctx.lineTo(bx,by); ctx.lineTo(bx,by+cs); ctx.stroke();
+  /* superior-derecha */
+  ctx.beginPath(); ctx.moveTo(bx+bw-cs,by); ctx.lineTo(bx+bw,by); ctx.lineTo(bx+bw,by+cs); ctx.stroke();
+  /* inferior-izquierda */
+  ctx.beginPath(); ctx.moveTo(bx+cs,by+bh); ctx.lineTo(bx,by+bh); ctx.lineTo(bx,by+bh-cs); ctx.stroke();
+  /* inferior-derecha */
+  ctx.beginPath(); ctx.moveTo(bx+bw-cs,by+bh); ctx.lineTo(bx+bw,by+bh); ctx.lineTo(bx+bw,by+bh-cs); ctx.stroke();
+}
 
-    // bones
-    CONN.forEach(([a, b]) => {
-      const p1 = lms[a], p2 = lms[b];
-      ctx.lineCap = 'round';
-      // outer aura
-      ctx.beginPath(); ctx.moveTo(p1.sx,p1.sy); ctx.lineTo(p2.sx,p2.sy);
-      ctx.strokeStyle = 'rgba(0,255,255,0.07)';
-      ctx.lineWidth = 18; ctx.stroke();
-      // mid glow
-      ctx.strokeStyle = 'rgba(0,220,255,0.22)';
-      ctx.lineWidth = 7; ctx.stroke();
-      // bright core
-      ctx.strokeStyle = 'rgba(200,255,255,0.95)';
-      ctx.lineWidth = 1.8; ctx.stroke();
-    });
+function renderFaceHUD() {
+  faceScroll = (faceScroll + 1.8) % H;
 
-    // joints
-    lms.forEach((lm, i) => {
-      const isTip  = [4,8,12,16,20].includes(i);
-      const isBase = [1,5,9,13,17].includes(i);
-      const r      = isTip ? 8 : isBase ? 5.5 : 4;
-      const pulse  = 1 + Math.sin(T*0.08 + i*0.35)*0.25;
-
-      const g = ctx.createRadialGradient(lm.sx,lm.sy,0, lm.sx,lm.sy,r*3.5*pulse);
-      g.addColorStop(0, isTip ? 'rgba(0,255,200,0.75)' : 'rgba(0,200,255,0.55)');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.beginPath();
-      ctx.arc(lm.sx, lm.sy, r*3.5*pulse, 0, 6.2832);
-      ctx.fillStyle = g;
-      ctx.fill();
-
-      // bright dot
-      ctx.beginPath();
-      ctx.arc(lm.sx, lm.sy, isTip ? 2.5 : 1.8, 0, 6.2832);
-      ctx.fillStyle = 'white';
-      ctx.fill();
-    });
+  if (!faceData || faceData.length === 0) {
+    /* estado: escaneando — scan line + texto */
+    ctx.save();
+    ctx.strokeStyle=`rgba(${A},.1)`; ctx.lineWidth=0.6; ctx.setLineDash([3,9]);
+    ctx.beginPath(); ctx.moveTo(0,faceScroll); ctx.lineTo(W,faceScroll); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font='500 11px Inter,sans-serif'; ctx.fillStyle=`rgba(${A},.35)`;
+    ctx.textAlign='center'; ctx.fillText('ESCANEANDO ROSTROS...',W/2,H/2);
+    ctx.restore();
+    return;
   }
 
-  ctx.globalCompositeOperation = 'source-over';
-  drawWatermark();
-}
+  faceData.forEach(det => {
+    const bb = det.boundingBox;
 
-/* ═══════════════════════════════════════════════════════════════
-   MODE 4 — MIRROR
-   Simetría 4-vías de la mano
-═══════════════════════════════════════════════════════════════ */
-function renderMirror() {
-  if (!landmarks) { drawWatermark(); return; }
-  ctx.globalCompositeOperation = 'lighter';
+    /* ── Convertir a coordenadas de pantalla (video espejado) ── */
+    /* El video se renderiza espejado (selfie), por eso invertimos x:
+       display_x = (1 - normalized_x) * W                          */
+    const screenCX = (1 - bb.xCenter) * W;
+    const screenCY =  bb.yCenter       * H;
+    const rw = bb.width  * W;
+    const rh = bb.height * H;
+    const rx = screenCX - rw/2;
+    const ry = screenCY - rh/2;
 
-  const handsN = Math.floor(landmarks.length/21);
-  // 4 reflections: original, flip-X, flip-Y, flip-both
-  const ref = [[1,1],[-1,1],[1,-1],[-1,-1]];
+    /* padding y tamaño de esquina */
+    const pad=18, cs=22;
+    const bx=rx-pad, by=ry-pad, bw=rw+pad*2, bh=rh+pad*2;
 
-  ref.forEach(([rx, ry], ri) => {
-    const hue = ri*90 + T*0.25;
-    for (let h = 0; h < handsN; h++) {
-      const lms = landmarks.slice(h*21, (h+1)*21).map(lm => ({
-        sx: rx === 1 ? lm.sx : W - lm.sx,
-        sy: ry === 1 ? lm.sy : H - lm.sy,
-      }));
+    /* ID aleatorio por rostro (clave = posición aproximada) */
+    const key=`${(bb.xCenter*4)|0}_${(bb.yCenter*4)|0}`;
+    if (!faceIds[key]) faceIds[key]={
+      id:'SIS-'+(Math.random()*90000+10000|0),
+      conf:(88+Math.random()*10).toFixed(1)
+    };
+    const fid=faceIds[key];
 
-      CONN.forEach(([a, b]) => {
-        const p1 = lms[a], p2 = lms[b];
-        ctx.beginPath(); ctx.moveTo(p1.sx,p1.sy); ctx.lineTo(p2.sx,p2.sy);
-        ctx.strokeStyle = `hsla(${hue},90%,65%,0.35)`;
-        ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.stroke();
-        ctx.strokeStyle = `hsla(${hue},100%,88%,0.55)`;
-        ctx.lineWidth = 0.8; ctx.stroke();
-      });
+    ctx.save();
+    ctx.shadowColor=ACCENT; ctx.shadowBlur=10;
+    ctx.strokeStyle=ACCENT;
+    drawHUDCorners(bx,by,bw,bh,cs);
 
-      lms.forEach((lm, i) => {
-        const r = [4,8,12,16,20].includes(i) ? 5 : 3;
-        const g = ctx.createRadialGradient(lm.sx,lm.sy,0,lm.sx,lm.sy,r*3);
-        g.addColorStop(0, `hsla(${hue},100%,70%,0.6)`);
-        g.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(lm.sx,lm.sy,r*3,0,6.2832);
-        ctx.fillStyle = g; ctx.fill();
+    /* líneas de extensión laterales (estilo HUD avanzado) */
+    ctx.strokeStyle=`rgba(${A},.3)`; ctx.lineWidth=0.7;
+    ctx.beginPath(); ctx.moveTo(bx,by+bh/2); ctx.lineTo(bx-30,by+bh/2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx+bw,by+bh/2); ctx.lineTo(bx+bw+30,by+bh/2); ctx.stroke();
+
+    /* scan line dentro del recuadro */
+    const sy=by+((faceScroll*.3+T*.7)%bh);
+    ctx.strokeStyle=`rgba(${A},.28)`; ctx.lineWidth=1; ctx.shadowBlur=3;
+    ctx.beginPath(); ctx.moveTo(bx,sy); ctx.lineTo(bx+bw,sy); ctx.stroke();
+
+    /* keypoints (ojos, nariz, boca) si están disponibles */
+    if (det.landmarks) {
+      det.landmarks.forEach(kp => {
+        /* también hay que espejar los keypoints */
+        const kx=(1-kp.x)*W, ky=kp.y*H;
+        ctx.beginPath(); ctx.arc(kx,ky,2.5,0,Math.PI*2);
+        ctx.fillStyle=`rgba(${A},.75)`;
+        ctx.shadowBlur=6; ctx.fill();
       });
     }
-  });
 
-  ctx.globalCompositeOperation = 'source-over';
-  drawWatermark();
-}
+    ctx.shadowBlur=0;
 
-/* ═══════════════════════════════════════════════════════════════
-   MODE 5 — FIRE
-   Fuego naranja/rojo sale de las puntas de los dedos
-═══════════════════════════════════════════════════════════════ */
-let fp = [];
+    /* ── Panel de datos ── posicionado debajo del recuadro,
+       o encima si está cerca del fondo de pantalla                 */
+    const panelH=56;
+    const gap=10;
+    const hasSpaceBelow = (by+bh+gap+panelH) < (H-60);
+    const labelY = hasSpaceBelow ? by+bh+gap : by-gap-panelH;
 
-function FP(x, y) {
-  this.x = x + (Math.random()-0.5)*10;
-  this.y = y;
-  this.vx = (Math.random()-0.5)*3.5;
-  this.vy = -(Math.random()*5.5 + 2.5);
-  this.life = 1;
-  this.decay = 0.016 + Math.random()*0.024;
-  this.r = Math.random()*5 + 2;
-}
-FP.prototype.update = function() {
-  this.vx += (Math.random()-0.5)*0.55;
-  this.vy -= 0.07;
-  this.x  += this.vx;
-  this.y  += this.vy;
-  this.life -= this.decay;
-};
-FP.prototype.draw = function() {
-  const age = 1 - this.life;
-  const hue = age<0.25 ? 58 : age<0.55 ? 28 : age<0.8 ? 10 : 0;
-  const lit = age<0.25 ? 96 : age<0.55 ? 72 : age<0.8 ? 52 : 30;
-  const sz  = this.r * this.life;
-  const g   = ctx.createRadialGradient(this.x,this.y,0,this.x,this.y,sz*3.5);
-  g.addColorStop(0, `hsla(${hue},100%,${lit+8}%,${this.life*0.45})`);
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.beginPath(); ctx.arc(this.x,this.y,sz*3.5,0,6.2832);
-  ctx.fillStyle = g; ctx.fill();
-  ctx.beginPath(); ctx.arc(this.x,this.y,sz,0,6.2832);
-  ctx.fillStyle = `hsla(${hue},100%,${lit}%,${this.life*0.9})`;
-  ctx.fill();
-};
+    /* fondo del panel */
+    ctx.fillStyle='rgba(5,5,8,.72)';
+    ctx.fillRect(bx, labelY, bw, panelH);
+    ctx.strokeStyle=`rgba(${A},.25)`; ctx.lineWidth=0.7;
+    ctx.strokeRect(bx, labelY, bw, panelH);
 
-function renderFire() {
-  ctx.globalCompositeOperation = 'lighter';
-  if (landmarks) {
-    const handsN = Math.floor(landmarks.length/21);
-    for (let h = 0; h < handsN; h++) {
-      [4,8,12,16,20].forEach(ti => {
-        const lm = landmarks[h*21+ti];
-        for (let j = 0; j < 9; j++) fp.push(new FP(lm.sx, lm.sy));
-      });
-    }
-  }
-  fp = fp.filter(p => { p.update(); if(p.life>0){p.draw();return true;} return false; });
-  ctx.globalCompositeOperation = 'source-over';
-  drawWatermark();
-}
+    /* textos del panel */
+    ctx.textAlign='left';
+    ctx.font=`700 11px Inter,sans-serif`; ctx.fillStyle=ACCENT;
+    ctx.fillText('FUTURO INGENIERO DETECTADO', bx+8, labelY+16);
 
-/* ═══════════════════════════════════════════════════════════════
-   MODE 6 — MATRIX
-   Lluvia de caracteres ASCII, la mano los perturba
-═══════════════════════════════════════════════════════════════ */
-const CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&<>{}[]/\\ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵカキクケコ'.split('');
-const COL_W  = 18;
-let mcols    = [];
+    ctx.font='400 9px Inter,sans-serif'; ctx.fillStyle=`rgba(${A},.65)`;
+    ctx.fillText(`ID: ${fid.id}`, bx+8, labelY+30);
+    ctx.textAlign='right';
+    ctx.fillText(`CONF: ${fid.conf}%`, bx+bw-8, labelY+30);
 
-function initMatrix() {
-  const n = Math.ceil(W/COL_W);
-  mcols = Array.from({length: n}, () => ({
-    y:     -Math.random()*H,
-    speed: 1.5 + Math.random()*2,
-    len:   (18 + Math.random()*18)|0,
-    trail: [],
-  }));
-  mcols.forEach(col => {
-    col.trail = Array.from({length: col.len}, () => CHARS[Math.random()*CHARS.length|0]);
+    ctx.textAlign='left';
+    const lat=(-17.783+(Math.random()-.5)*.0015).toFixed(5);
+    const lon=(-63.182+(Math.random()-.5)*.0015).toFixed(5);
+    ctx.fillStyle=`rgba(${A},.42)`;
+    ctx.fillText(`LAT ${lat}  ·  LON ${lon}`, bx+8, labelY+44);
+
+    ctx.restore();
   });
 }
 
-function renderMatrix() {
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.font = `${COL_W-2}px monospace`;
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 4 — TWO HANDS
+   Figuras geométricas generadas por la posición relativa de ambas manos.
+════════════════════════════════════════════════════════════════════════ */
+function renderTwoHands() {
+  if (handsData.length < 2) {
+    ctx.save();
+    ctx.font='400 12px Inter,sans-serif'; ctx.fillStyle='rgba(255,255,255,.18)';
+    ctx.textAlign='center'; ctx.fillText('Muestra ambas manos',W/2,H/2);
+    ctx.restore(); return;
+  }
+  const h0=handsData[0].landmarks, h1=handsData[1].landmarks;
+  const p0=palmCenter(h0), p1=palmCenter(h1);
+  const dist=Math.hypot(p1.x-p0.x, p1.y-p0.y);
+  const mx=(p0.x+p1.x)/2, my=(p0.y+p1.y)/2;
+  const normD=Math.min(1,dist/(Math.max(W,H)*.7));
+  const yDiff=Math.abs(p0.y-p1.y), xDiff=Math.abs(p0.x-p1.x);
 
-  mcols.forEach((col, ci) => {
-    const x = ci*COL_W + 2;
-    let nearHand = false;
-    if (landmarks) {
-      for (let i = 0; i < landmarks.length; i++)
-        if (Math.abs(landmarks[i].sx - x) < 60) { nearHand = true; break; }
-    }
+  ctx.save();
+  ctx.shadowBlur=14; ctx.lineWidth=1.3;
 
-    col.speed = nearHand ? 6 + Math.random()*4 : 1.5 + Math.random();
-    if (nearHand && Math.random() < 0.35)
-      col.trail[Math.random()*col.trail.length|0] = CHARS[Math.random()*CHARS.length|0];
-
-    col.trail.forEach((ch, i) => {
-      const py = col.y - i*COL_W;
-      if (py < -COL_W || py > H+COL_W) return;
-      const fade   = Math.max(0, 1 - i/col.len);
-      const isHead = i === 0;
-      if (nearHand) {
-        ctx.fillStyle = isHead
-          ? 'rgba(255,200,80,1)'
-          : `rgba(255,${(120+fade*80)|0},0,${fade*0.8})`;
-      } else {
-        ctx.fillStyle = isHead
-          ? 'rgba(180,255,180,1)'
-          : `rgba(0,${(180*fade+40)|0},0,${fade*0.85})`;
+  if (yDiff > xDiff*1.4 && yDiff > 110) {
+    /* ── una mano arriba + otra abajo → línea vertical con ondas ── */
+    ctx.strokeStyle=`rgba(124,58,237,.72)`; ctx.shadowColor='rgba(124,58,237,.5)';
+    for (let side=-1;side<=1;side+=2) {
+      ctx.beginPath();
+      for (let i=0;i<=60;i++) {
+        const t=i/60, wy=my-dist/2+t*dist;
+        const wx=mx+side*Math.sin(t*Math.PI*6+T*.09)*(normD*55+12);
+        i===0?ctx.moveTo(wx,wy):ctx.lineTo(wx,wy);
       }
-      ctx.fillText(ch, x, py);
-    });
-
-    col.y += col.speed;
-    if (col.y > H + col.len*COL_W) {
-      col.y = -col.len*COL_W;
-      col.trail = Array.from({length: col.len}, () => CHARS[Math.random()*CHARS.length|0]);
+      ctx.stroke();
     }
-    if (Math.random() < 0.04)
-      col.trail[Math.random()*col.trail.length|0] = CHARS[Math.random()*CHARS.length|0];
-  });
+  } else if (normD > .52) {
+    /* ── manos separadas o cruzadas → constelación ── */
+    ctx.strokeStyle=`rgba(${A},.3)`; ctx.shadowColor=`rgba(${A},.35)`;
+    ctx.lineWidth=0.8;
+    const pts=[];
+    [0,4,8,12,16,20].forEach(i=>{pts.push({x:h0[i].sx,y:h0[i].sy});});
+    [0,4,8,12,16,20].forEach(i=>{pts.push({x:h1[i].sx,y:h1[i].sy});});
+    for (let i=0;i<6;i++) pts.push({x:mx+(Math.random()-.5)*dist*.5, y:my+(Math.random()-.5)*dist*.5});
+    for (let i=0;i<pts.length;i++) for (let j=i+1;j<pts.length;j++) {
+      const d=Math.hypot(pts[i].x-pts[j].x, pts[i].y-pts[j].y);
+      if (d<175) {
+        ctx.globalAlpha=(1-d/175)*.65;
+        ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[j].x,pts[j].y); ctx.stroke();
+      }
+    }
+    ctx.globalAlpha=1;
+    ctx.fillStyle=`rgba(${A},.85)`;
+    pts.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,2,0,Math.PI*2);ctx.fill();});
+  } else {
+    /* ── manos cerca → círculo que se expande ── */
+    const r=dist/2;
+    const segs=Math.max(3,Math.floor(normD*8)+3);
+    ctx.strokeStyle=`rgba(${A},.78)`; ctx.shadowColor=`rgba(${A},.45)`;
+    ctx.beginPath(); ctx.arc(mx,my,r,0,Math.PI*2); ctx.stroke();
+    ctx.strokeStyle=`rgba(${A},.28)`; ctx.lineWidth=0.7;
+    for (let i=0;i<segs;i++) {
+      const a1=(i/segs)*Math.PI*2+T*.012;
+      const a2=((i+segs/2)/segs)*Math.PI*2+T*.012;
+      ctx.beginPath();
+      ctx.moveTo(mx+Math.cos(a1)*r, my+Math.sin(a1)*r);
+      ctx.lineTo(mx+Math.cos(a2)*r, my+Math.sin(a2)*r);
+      ctx.stroke();
+    }
+    ctx.strokeStyle=`rgba(${A},.35)`; ctx.lineWidth=0.8; ctx.setLineDash([4,7]);
+    ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
-  drawWatermark();
+  /* punto en cada palma */
+  ctx.shadowBlur=22; ctx.shadowColor=ACCENT; ctx.fillStyle=`rgba(${A},.95)`;
+  [p0,p1].forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,4.5,0,Math.PI*2);ctx.fill();});
+  ctx.restore();
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   MODE 7 — BINARY
-   Objetos se llenan con 1s y 0s estilo máquina de escribir
-═══════════════════════════════════════════════════════════════ */
-const CELL = 20;
-let bcells = [];
-let boff   = null;
-let boctx  = null;
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 5 — BINARY
+   Lluvia de 0s y 1s que se desvía al detectar la mano.
+════════════════════════════════════════════════════════════════════════ */
+const BCELL = 22;
+let bcols = [];
 
 function initBinary() {
-  const cols = Math.ceil(W/CELL), rows = Math.ceil(H/CELL);
-  bcells = Array.from({length: rows}, (_, r) =>
-    Array.from({length: cols}, (_, c) => ({
-      x: c*CELL, y: r*CELL, ch: '0', a: 0, ta: 0, tick: (Math.random()*20)|0
-    }))
-  );
-  boff  = document.createElement('canvas');
-  boff.width  = cols;
-  boff.height = rows;
-  boctx = boff.getContext('2d');
+  const n=Math.ceil(W/BCELL);
+  bcols=Array.from({length:n},(_,i)=>({
+    x:i*BCELL+BCELL/2, ox:i*BCELL+BCELL/2,
+    y:-Math.random()*H,
+    speed:1.4+Math.random()*2.2,
+    len:(13+Math.random()*18)|0,
+    chars:[], tick:(Math.random()*20)|0,
+  }));
+  bcols.forEach(col=>{
+    col.chars=Array.from({length:col.len},()=>Math.random()<.5?'1':'0');
+  });
 }
 
 function renderBinary() {
-  // sample camera at grid resolution
-  boctx.save();
-  boctx.scale(-1, 1);
-  boctx.translate(-boff.width, 0);
-  boctx.drawImage(vid, 0, 0, boff.width, boff.height);
-  boctx.restore();
-  const px = boctx.getImageData(0, 0, boff.width, boff.height).data;
+  ctx.save();
+  ctx.font=`500 ${BCELL-4}px 'Courier New',monospace`;
+  bcols.forEach(col => {
+    let near=false, repDx=0;
+    if (landmarks) for (let i=0;i<landmarks.length;i++) {
+      const dx=landmarks[i].sx-col.x;
+      if (Math.abs(dx)<BCELL*4.5) { near=true; repDx+=dx*.12; break; }
+    }
+    if (near)  { col.x+=(repDx*.08); col.speed=5+Math.random()*3; }
+    else        { col.x+=(col.ox-col.x)*.06; col.speed=1.4+Math.random()*.5; }
 
-  ctx.globalCompositeOperation = 'source-over';
-  ctx.font = `bold ${CELL-3}px monospace`;
+    col.tick++;
+    if (col.tick%7===0) col.chars[Math.random()*col.len|0]=Math.random()<.5?'1':'0';
 
-  bcells.forEach((row, ri) => {
-    row.forEach((cell, ci) => {
-      const idx    = (ri*row.length + ci)*4;
-      const bright = (px[idx]+px[idx+1]+px[idx+2]) / 765;
-      let near = false;
-      if (landmarks) {
-        for (let i = 0; i < landmarks.length; i++)
-          if (Math.abs(landmarks[i].sx-cell.x)<CELL*3.5 &&
-              Math.abs(landmarks[i].sy-cell.y)<CELL*3.5) { near=true; break; }
+    col.chars.forEach((ch,i) => {
+      const py=col.y-i*BCELL; if(py<-BCELL||py>H+BCELL)return;
+      const fade=Math.max(0,1-i/col.len), isHead=(i===0);
+      if (isHead) {
+        ctx.fillStyle=near?'rgba(255,255,255,1)':`rgba(${A},1)`;
+        ctx.shadowColor=near?'#fff':ACCENT; ctx.shadowBlur=10;
+      } else {
+        ctx.shadowBlur=0;
+        const v=near?(200*fade)|0:(40+80*fade)|0;
+        /* color UPSA en cascada */
+        ctx.fillStyle=near
+          ? `rgba(${v+30},${v+30},${v+30},${fade*.9})`
+          : `rgba(${40+(v*.35)|0},${v+85},${30+(v*.18)|0},${fade*.82})`;
       }
-      cell.ta  = near ? 1 : bright > 0.28 ? bright*0.88 : 0;
-      cell.a  += (cell.ta - cell.a) * 0.07;
-      if (cell.a < 0.04) return;
-      cell.tick++;
-      if (cell.tick % 10 === 0) cell.ch = Math.random() < 0.5 ? '1' : '0';
-      ctx.fillStyle = near
-        ? `rgba(255,140,0,${cell.a})`
-        : `rgba(0,${(200+bright*55)|0},0,${cell.a})`;
-      ctx.fillText(cell.ch, cell.x+1, cell.y+CELL-3);
+      ctx.fillText(ch, col.x-BCELL/2+2, py);
+    });
+    ctx.shadowBlur=0;
+    col.y+=col.speed;
+    if (col.y>H+col.len*BCELL) {
+      col.y=-col.len*BCELL;
+      col.chars=Array.from({length:col.len},()=>Math.random()<.5?'1':'0');
+    }
+  });
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 6 — CIRCUIT
+   Trazos PCB que se generan desde los dedos y se extienden por pantalla.
+════════════════════════════════════════════════════════════════════════ */
+let circSegs=[], circTimer=0;
+
+/** Genera segmentos de traza PCB (solo 90°) desde un punto origen */
+function genCircuit(sx, sy) {
+  const segs=[];
+  let x=sx, y=sy;
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  let dir=dirs[Math.random()*4|0];
+  for (let s=0;s<7;s++) {
+    const len=35+Math.random()*115;
+    /* snap a grilla de 5px para look PCB */
+    const nx=Math.round((x+dir[0]*len)/5)*5;
+    const ny=Math.round((y+dir[1]*len)/5)*5;
+    segs.push({type:'trace',x1:x,y1:y,x2:nx,y2:ny,a:0,maxA:.5+Math.random()*.4,life:1});
+    if (Math.random()<.4) segs.push({type:'via',x:nx,y:ny,a:0,maxA:.72,life:1});
+    if (Math.random()<.55) dir=dirs[Math.random()*4|0];
+    x=nx; y=ny;
+  }
+  return segs;
+}
+
+function renderCircuit() {
+  if (!landmarks) {
+    /* grilla de fondo cuando no hay mano */
+    ctx.save();
+    ctx.strokeStyle=`rgba(${A},.05)`; ctx.lineWidth=0.7;
+    for (let x=0;x<W;x+=56){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+    for (let y=0;y<H;y+=56){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+    ctx.restore(); return;
+  }
+  circTimer++;
+  if (circTimer%5===0 && circSegs.length<280) {
+    handsData.forEach(hand=>{
+      [4,8,12,16,20].forEach(ti=>{
+        const lm=hand.landmarks[ti];
+        if (lm) circSegs.push(...genCircuit(lm.sx,lm.sy));
+      });
+    });
+  }
+  ctx.save(); ctx.shadowColor=ACCENT;
+  circSegs=circSegs.filter(s=>s.life>0.01);
+  circSegs.forEach(s=>{
+    s.a=Math.min(s.maxA,s.a+.06); s.life-=.007;
+    const a=s.a*s.life;
+    if (s.type==='via') {
+      ctx.shadowBlur=7; ctx.strokeStyle=`rgba(${A},${a})`;
+      ctx.lineWidth=1.1; ctx.beginPath(); ctx.arc(s.x,s.y,3.5,0,Math.PI*2); ctx.stroke();
+      ctx.fillStyle=`rgba(${A},${a*.7})`; ctx.beginPath(); ctx.arc(s.x,s.y,1.2,0,Math.PI*2); ctx.fill();
+    } else {
+      ctx.shadowBlur=4; ctx.strokeStyle=`rgba(${A},${a})`;
+      ctx.lineWidth=1.0; ctx.beginPath(); ctx.moveTo(s.x1,s.y1); ctx.lineTo(s.x2,s.y2); ctx.stroke();
+    }
+  });
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 7 — WIREFRAME
+   Malla triangulada sobre la mano con scan line de "escáner".
+════════════════════════════════════════════════════════════════════════ */
+/* Triángulos entre landmarks de la mano */
+const TRI=[
+  [0,1,5],[0,5,9],[0,9,13],[0,13,17],
+  [1,2,5],[2,3,5],[3,4,5],
+  [5,6,9],[6,7,9],[7,8,9],
+  [9,10,13],[10,11,13],[11,12,13],
+  [13,14,17],[14,15,17],[15,16,17],
+];
+let scanY=0;
+
+function renderWireframe() {
+  if (!landmarks) return;
+  scanY=(scanY+2.2)%H;
+  ctx.save();
+  handsData.forEach(hand=>{
+    const lms=hand.landmarks;
+    TRI.forEach(([a,b,cc])=>{
+      const p0=lms[a],p1=lms[b],p2=lms[cc];
+      const avgY=(p0.sy+p1.sy+p2.sy)/3, scanned=(avgY<scanY);
+      ctx.beginPath(); ctx.moveTo(p0.sx,p0.sy); ctx.lineTo(p1.sx,p1.sy); ctx.lineTo(p2.sx,p2.sy); ctx.closePath();
+      ctx.fillStyle=scanned?`rgba(${A},.065)`:`rgba(${A},.018)`; ctx.fill();
+      ctx.strokeStyle=scanned?`rgba(${A},.78)`:`rgba(${A},.22)`;
+      ctx.lineWidth=0.75; ctx.shadowColor=ACCENT; ctx.shadowBlur=scanned?7:1; ctx.stroke();
+    });
+    CONN.forEach(([a,b])=>{
+      ctx.beginPath(); ctx.moveTo(lms[a].sx,lms[a].sy); ctx.lineTo(lms[b].sx,lms[b].sy);
+      ctx.strokeStyle=`rgba(${A},.48)`; ctx.lineWidth=0.8; ctx.shadowBlur=2; ctx.stroke();
+    });
+    lms.forEach((lm,i)=>{
+      const tip=[4,8,12,16,20].includes(i);
+      ctx.beginPath(); ctx.arc(lm.sx,lm.sy,tip?3:1.8,0,Math.PI*2);
+      ctx.fillStyle=tip?'rgba(255,255,255,.92)':`rgba(${A},.82)`;
+      ctx.shadowBlur=tip?10:4; ctx.fill();
+    });
+  });
+  /* scan line */
+  ctx.shadowBlur=0;
+  ctx.strokeStyle=`rgba(${A},.22)`; ctx.lineWidth=1; ctx.setLineDash([2,8]);
+  ctx.beginPath(); ctx.moveTo(0,scanY); ctx.lineTo(W,scanY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle=`rgba(${A},.5)`; ctx.font='500 9px Inter,sans-serif'; ctx.textAlign='right';
+  ctx.fillText('SCANNING',W-18,scanY-5);
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 8 — SOUND WAVE
+   Ondas concéntricas desde la palma + forma de onda horizontal.
+════════════════════════════════════════════════════════════════════════ */
+let waves=[], waveT=0;
+
+function Wave(x,y,spd) {
+  this.x=x; this.y=y; this.r=0;
+  this.maxR=180+Math.random()*120;
+  this.spd=spd||2+Math.random()*2;
+  this.a=.75;
+}
+Wave.prototype.tick=function(){ this.r+=this.spd; this.a=(1-this.r/this.maxR)*.7; };
+Wave.prototype.draw=function(){
+  if(this.a<=0)return;
+  ctx.beginPath(); ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+  ctx.strokeStyle=`rgba(124,58,237,${this.a})`;
+  ctx.lineWidth=1-this.r/this.maxR*.4;
+  ctx.shadowColor='rgba(124,58,237,.4)'; ctx.shadowBlur=8;
+  ctx.stroke();
+};
+
+function renderSoundWave() {
+  waveT++;
+  if (handsData.length>0) {
+    handsData.forEach(hand=>{
+      const pc=palmCenter(hand.landmarks);
+      if (waveT%11===0) for(let i=0;i<3;i++) waves.push(new Wave(pc.x+(Math.random()-.5)*18,pc.y+(Math.random()-.5)*18,2+i*1.1));
+      if (waveT%22===0) [4,8,12,16,20].forEach(ti=>waves.push(new Wave(hand.landmarks[ti].sx,hand.landmarks[ti].sy,1.5+Math.random())));
+    });
+  } else {
+    if (waveT%22===0) for(let i=0;i<3;i++) waves.push(new Wave(W/2,H*.5,1.4+i*.8));
+  }
+  ctx.save();
+  waves=waves.filter(w=>w.a>.01);
+  waves.forEach(w=>{w.tick();w.draw();});
+  /* forma de onda 2D en el tercio inferior */
+  const baseAmp=handsData.length?62:22;
+  ctx.shadowColor='rgba(124,58,237,.3)'; ctx.shadowBlur=5;
+  for (let pass=0;pass<2;pass++) {
+    ctx.strokeStyle=`rgba(124,58,237,${pass===0?.42:.24})`;
+    ctx.lineWidth=1.3*(1-pass*.3);
+    const wy=H*(pass===0?.7:.78), mult=pass===0?1:.55;
+    ctx.beginPath();
+    for (let x=0;x<=W;x+=2) {
+      const y=wy+Math.sin(x*.038+T*.08)*baseAmp*mult*Math.sin(T*.03+pass)
+              +Math.sin(x*.02+T*.05)*baseAmp*.42*mult;
+      x===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   UTILIDAD — SUBTÍTULO MOTIVACIONAL
+   Cada filtro llama a drawTagline() para mostrar su mensaje a bachilleres.
+════════════════════════════════════════════════════════════════════════ */
+function drawTagline(text) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.font = '500 11px Inter, sans-serif';
+  ctx.letterSpacing = '2px';
+  ctx.fillStyle = `rgba(${A},0.48)`;
+  ctx.fillText(text.toUpperCase(), W/2, H - 78);
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 9 — HACKER
+   Lluvia de comandos reales de programación; la mano activa el "acceso".
+════════════════════════════════════════════════════════════════════════ */
+const HACK_CMDS = [
+  'git commit -m "feat: new feature"', 'npm install react vite tailwindcss',
+  'python3 main.py --config prod.yml',  'sudo apt-get update && apt-get upgrade',
+  'docker run -it --rm ubuntu:22.04',   'SELECT * FROM users WHERE active=1',
+  'ls -la /var/www/html',               'ssh admin@192.168.1.1 -p 22',
+  'curl -X POST https://api/v1/login',  'chmod +x deploy.sh && ./deploy.sh',
+  'ping -c 4 google.com',              'netstat -tulnp | grep LISTEN',
+  'git push origin main',              'npm run build && npm start',
+  'python -m pip install flask sqlalchemy', './gradlew bootRun',
+  'mongod --config /etc/mongod.conf',  'node server.js --port 3000',
+  'systemctl restart nginx',           'grep -rn "TODO" ./src --include="*.js"',
+  'find / -name "*.env" 2>/dev/null',  'ps aux | grep "node" | awk "{print $2}"',
+  'iptables -A INPUT -p tcp --dport 443 -j ACCEPT',
+  'import tensorflow as tf; model.fit(X,y)',
+  'const app = express(); app.listen(8080)',
+  'kubectl get pods --all-namespaces',  'terraform apply -auto-approve',
+  'git log --oneline --graph --decorate','nmap -sV -O 192.168.1.0/24',
+  'base64 -d <<< "SW5nLiBTaXN0ZW1hcw=="','export DATABASE_URL="postgres://..."',
+  'java -jar app.jar --spring.profiles=prod','mvn clean package -DskipTests',
+  'SELECT table_name FROM information_schema.tables',
+  'for i in range(1000): train(model)',  'while(true){processQueue();}',
+  'console.log("Hello, Systems Engineer!")', 'print("¡Bienvenido a Ing. Sistemas!")',
+];
+let hkCols = [];
+
+function initHacker() {
+  const n = Math.max(8, Math.ceil(W / 260));
+  hkCols = Array.from({length: n}, (_, i) => ({
+    x: (i / n) * W + Math.random() * (W/n * 0.6),
+    y: -Math.random() * H,
+    speed: 0.5 + Math.random() * 0.7,
+    cmd: HACK_CMDS[Math.random() * HACK_CMDS.length | 0],
+    alpha: 0.28 + Math.random() * 0.35,
+    bright: Math.random() < 0.22,
+  }));
+}
+
+function renderHacker() {
+  const hasHand = landmarks && landmarks.length > 0;
+
+  /* tinte terminal verde muy sutil */
+  ctx.fillStyle = 'rgba(0,6,0,0.12)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  hkCols.forEach(col => {
+    let near = false;
+    if (landmarks) for (let i=0; i<landmarks.length; i++)
+      if (Math.hypot(landmarks[i].sx-col.x, landmarks[i].sy-col.y) < 160) { near=true; break; }
+
+    col.speed = near ? 3.5 + Math.random()*2 : 0.45 + Math.random()*0.55;
+    col.y += col.speed;
+    if (col.y > H + 18) {
+      col.y = -18;
+      col.cmd = HACK_CMDS[Math.random()*HACK_CMDS.length|0];
+      col.x = Math.random()*W;
+      col.alpha = 0.28 + Math.random()*0.35;
+      col.bright = Math.random() < 0.22;
+    }
+    if (near && Math.random() < 0.06) col.cmd = HACK_CMDS[Math.random()*HACK_CMDS.length|0];
+
+    const a = near ? Math.min(1, col.alpha*2.4) : col.alpha;
+    ctx.font = `${col.bright?'600':'400'} ${col.bright?11:10}px 'Courier New',monospace`;
+
+    if (col.bright || near) {
+      ctx.shadowColor = ACCENT; ctx.shadowBlur = near ? 14 : 6;
+      ctx.fillStyle   = near ? `rgba(255,255,255,${a})` : `rgba(${A},${a})`;
+    } else {
+      ctx.shadowBlur = 0;
+      ctx.fillStyle  = `rgba(${A},${a*0.65})`;
+    }
+    ctx.textAlign = 'left';
+    ctx.fillText(col.cmd, col.x, col.y);
+
+    /* cursor parpadeante */
+    if ((col.bright||near) && Math.floor(T/18)%2===0) {
+      ctx.fillStyle = `rgba(${A},0.95)`;
+      ctx.fillRect(col.x + ctx.measureText(col.cmd).width + 3, col.y - 11, 7, 13);
+    }
+  });
+  ctx.shadowBlur = 0;
+
+  /* halo en la palma cuando hay mano */
+  if (hasHand) handsData.forEach(hand => {
+    const pc = palmCenter(hand.landmarks);
+    const g = ctx.createRadialGradient(pc.x,pc.y,0,pc.x,pc.y,130);
+    g.addColorStop(0,`rgba(${A},0.10)`); g.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.globalCompositeOperation='lighter';
+    ctx.fillStyle=g; ctx.fillRect(pc.x-130,pc.y-130,260,260);
+    ctx.globalCompositeOperation='source-over';
+  });
+
+  /* estado en la esquina inferior izquierda */
+  ctx.font = '500 10px "Courier New",monospace';
+  ctx.fillStyle = `rgba(${A},${hasHand?0.9:0.5})`;
+  ctx.textAlign = 'left';
+  ctx.shadowColor = ACCENT; ctx.shadowBlur = hasHand ? 8 : 0;
+  ctx.fillText(hasHand ? '[ ACCESO CONCEDIDO ]' : '[ CONECTANDO... ]', 18, H-80);
+  ctx.shadowBlur = 0;
+
+  ctx.restore();
+  drawTagline('esto lo construís en Ingeniería de Sistemas');
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 10 — AI SCAN
+   Análisis de perfil con barras de progreso y resultado motivacional 99%.
+   El ciclo es automático: intro → scan → análisis → celebración → repeat.
+════════════════════════════════════════════════════════════════════════ */
+let aiTimer = 0;
+const AI_CYCLE = 500; /* frames por ciclo completo */
+const AI_ATTRS = [
+  {label:'Pensamiento lógico',       pct:97},
+  {label:'Resolución de problemas',  pct:98},
+  {label:'Creatividad tecnológica',  pct:96},
+  {label:'Trabajo en equipo',        pct:99},
+  {label:'Adaptabilidad digital',    pct:95},
+];
+let aiProg = [0,0,0,0,0];
+
+function renderAIScan() {
+  aiTimer++;
+  if (aiTimer > AI_CYCLE) { aiTimer=1; aiProg=[0,0,0,0,0]; }
+
+  const phase = aiTimer < 80 ? 0 : aiTimer < 170 ? 1 : aiTimer < 390 ? 2 : 3;
+  const cx=W/2, cy=H/2;
+  ctx.save();
+
+  /* ── Fase 0: arranque del sistema ── */
+  if (phase===0) {
+    const p = aiTimer/80;
+    ctx.textAlign='center'; ctx.shadowColor=ACCENT; ctx.shadowBlur=10*p;
+    ctx.font=`600 13px Inter,sans-serif`; ctx.fillStyle=`rgba(${A},${p})`;
+    ctx.fillText('SISTEMA DE ANÁLISIS IA v2.6'+'…'.slice(0,(aiTimer/18)|0%4), cx, cy-16);
+    ctx.shadowBlur=0; ctx.font='400 9px Inter,sans-serif';
+    ctx.fillStyle=`rgba(${A},${p*.5})`; ctx.fillText('UPSA · Ingeniería de Sistemas', cx, cy+8);
+  }
+
+  /* ── Fase 1: anillo de escaneo ── */
+  else if (phase===1) {
+    const p=(aiTimer-80)/90; // 0→1
+    ctx.strokeStyle=`rgba(${A},0.85)`; ctx.lineWidth=2;
+    ctx.shadowColor=ACCENT; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.arc(cx,cy,90,-Math.PI/2,-Math.PI/2+p*Math.PI*2); ctx.stroke();
+    /* anillos internos */
+    [60,35].forEach((r,i)=>{
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(${A},${0.25-i*.1})`; ctx.lineWidth=1; ctx.shadowBlur=4; ctx.stroke();
+    });
+    /* retícula */
+    ctx.shadowBlur=0; ctx.strokeStyle=`rgba(${A},0.4)`; ctx.lineWidth=0.7;
+    ctx.setLineDash([4,7]);
+    ctx.beginPath(); ctx.moveTo(cx-110,cy); ctx.lineTo(cx+110,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,cy-110); ctx.lineTo(cx,cy+110); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.font='600 12px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle=`rgba(${A},0.9)`; ctx.shadowBlur=6;
+    ctx.fillText('ESCANEANDO PERFIL...', cx, cy+118);
+    ctx.shadowBlur=0; ctx.font='400 9px Inter,sans-serif';
+    ctx.fillStyle=`rgba(${A},.45)`;
+    ctx.fillText(`${(p*100)|0}% COMPLETADO`, cx, cy+134);
+  }
+
+  /* ── Fase 2: barras de progreso ── */
+  else if (phase===2) {
+    const phT = aiTimer-170;
+    AI_ATTRS.forEach((attr,i)=>{
+      const start=i*28, t=Math.max(0,Math.min(1,(phT-start)/50));
+      aiProg[i]+=(attr.pct/100-aiProg[i])*.1*t;
+    });
+    const pw=Math.min(380,W*.48), px=cx-pw/2, py=cy-118;
+    ctx.fillStyle='rgba(4,10,4,0.88)'; ctx.fillRect(px-14,py-28,pw+28,208);
+    ctx.strokeStyle=`rgba(${A},.28)`; ctx.lineWidth=0.8; ctx.strokeRect(px-14,py-28,pw+28,208);
+
+    ctx.font='600 11px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle=ACCENT; ctx.shadowColor=ACCENT; ctx.shadowBlur=6;
+    ctx.fillText('ANALIZANDO APTITUDES TECNOLÓGICAS', cx, py-8);
+    ctx.shadowBlur=0;
+
+    AI_ATTRS.forEach((attr,i)=>{
+      const y=py+14+i*36;
+      ctx.font='400 9px Inter,sans-serif'; ctx.textAlign='left';
+      ctx.fillStyle='rgba(255,255,255,0.72)'; ctx.fillText(attr.label.toUpperCase(), px, y);
+      /* track */
+      ctx.fillStyle=`rgba(${A},.1)`; ctx.fillRect(px,y+8,pw-2,7);
+      /* fill */
+      const fw=(aiProg[i])*(pw-2);
+      const g=ctx.createLinearGradient(px,0,px+fw,0);
+      g.addColorStop(0,`rgba(${A},.5)`); g.addColorStop(1,`rgba(${A},.95)`);
+      ctx.fillStyle=g; ctx.fillRect(px,y+8,fw,7);
+      /* porcentaje */
+      ctx.textAlign='right'; ctx.fillStyle=`rgba(${A},.9)`;
+      ctx.font='600 9px Inter,sans-serif';
+      ctx.fillText(`${(aiProg[i]*100)|0}%`, px+pw, y);
+    });
+  }
+
+  /* ── Fase 3: resultado celebratorio ── */
+  else {
+    const p=Math.min(1,(aiTimer-390)/50);
+    /* círculo exterior pulsante */
+    ctx.strokeStyle=`rgba(${A},${.9*p})`; ctx.lineWidth=2;
+    ctx.shadowColor=ACCENT; ctx.shadowBlur=30*p;
+    ctx.beginPath(); ctx.arc(cx,cy-30,110*p,0,Math.PI*2); ctx.stroke();
+    /* número grande */
+    ctx.font=`700 ${(52*p)|0}px Space Grotesk,sans-serif`;
+    ctx.textAlign='center'; ctx.fillStyle=`rgba(${A},${p})`;
+    ctx.shadowBlur=20*p; ctx.fillText('99%', cx, cy-10);
+    /* texto inferior */
+    ctx.font=`600 ${(12*p)|0}px Inter,sans-serif`;
+    ctx.fillStyle=`rgba(255,255,255,${.92*p})`; ctx.shadowBlur=0;
+    ctx.fillText('COMPATIBILIDAD CON ING. DE SISTEMAS', cx, cy+36);
+    ctx.font=`500 ${(11*p)|0}px Inter,sans-serif`;
+    ctx.fillStyle=`rgba(${A},${.88*p})`;
+    ctx.fillText('CONFIRMADA ✓', cx, cy+56);
+    /* partículas de celebración */
+    if (p>.8) for (let i=0;i<12;i++) {
+      const a=(i/12)*Math.PI*2+T*.04;
+      const r=118+Math.sin(T*.1+i)*14;
+      ctx.beginPath(); ctx.arc(cx+Math.cos(a)*r, cy-30+Math.sin(a)*r, 2.5,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${A},${(p-.8)*5*.9})`; ctx.shadowBlur=8; ctx.fill();
+    }
+  }
+
+  ctx.restore();
+  drawTagline('la IA que ves aquí la programan los ingenieros');
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 11 — GAME
+   Breakout retro a pantalla completa controlado con el dedo índice.
+   Botones de gamepad sobre las puntas de los dedos.
+════════════════════════════════════════════════════════════════════════ */
+const GAME_BTNS=[
+  {lm:8,  label:'Y',  col:'255,215,0'},
+  {lm:12, label:'X',  col:'80,150,255'},
+  {lm:16, label:'B',  col:'255,70,70'},
+  {lm:20, label:'A',  col:'91,181,58'},
+];
+const BK_COLORS=['255,80,80','255,140,0','255,215,0','91,181,58',
+                 '80,180,255','160,100,255','255,60,160','220,220,220'];
+let ball={x:0,y:0,vx:0,vy:0}, paddle={x:0,y:0,w:0,h:0};
+let bricks=[], gameScore=0, gameReady=false, gameLives=3;
+
+function initGame() {
+  const spd=Math.min(W,H)*.0065;
+  ball={x:W/2, y:H*.72, vx:spd*.8, vy:-spd};
+  paddle={x:W/2-W*.07, y:H*.82, w:W*.14, h:Math.max(10,H*.014)};
+  bricks=[]; gameScore=0; gameLives=3;
+  const cols=10, rows=5;
+  const bw=(W*.84)/cols, bh=Math.max(16,H*.036), gap=4;
+  for(let r=0;r<rows;r++) for(let cc=0;cc<cols;cc++)
+    bricks.push({
+      x:W*.08+cc*(bw+gap), y:H*.1+r*(bh+gap),
+      w:bw-gap, h:bh-gap,
+      alive:true, col:BK_COLORS[cc%BK_COLORS.length], pts:(rows-r)*10
+    });
+  gameReady=true;
+}
+
+function renderGame() {
+  if (!gameReady) initGame();
+
+  ctx.save();
+
+  /* fondo semitransparente sobre el video */
+  ctx.fillStyle='rgba(0,4,0,0.55)'; ctx.fillRect(0,0,W,H);
+
+  /* ── mover paddle: sigue el dedo índice de la primera mano ── */
+  if (handsData.length>0) {
+    const ix=handsData[0].landmarks[8].sx;
+    paddle.x=Math.max(0, Math.min(W-paddle.w, ix-paddle.w/2));
+  }
+
+  /* ── física de pelota ── */
+  ball.x+=ball.vx; ball.y+=ball.vy;
+  if(ball.x<=6||ball.x>=W-6) ball.vx*=-1;
+  if(ball.y<=6) ball.vy*=-1;
+  if(ball.y>H+20){
+    gameLives--;
+    const spd=Math.min(W,H)*.0065;
+    ball={x:W/2,y:H*.72,vx:spd*(Math.random()>.5?1:-1),vy:-spd};
+    if(gameLives<=0) initGame();
+  }
+  /* colisión paddle */
+  if(ball.y>=paddle.y-6&&ball.y<=paddle.y+paddle.h&&
+     ball.x>=paddle.x&&ball.x<=paddle.x+paddle.w){
+    ball.vy=-Math.abs(ball.vy);
+    /* ángulo según posición en el paddle */
+    const rel=(ball.x-(paddle.x+paddle.w/2))/(paddle.w/2);
+    ball.vx=rel*Math.min(W,H)*.008;
+  }
+  /* colisión ladrillos */
+  bricks.forEach(b=>{
+    if(!b.alive)return;
+    if(ball.x>b.x&&ball.x<b.x+b.w&&ball.y>b.y&&ball.y<b.y+b.h){
+      b.alive=false; ball.vy*=-1; gameScore+=b.pts;
+    }
+  });
+  if(bricks.every(b=>!b.alive)) initGame();
+
+  /* ── dibujar ladrillos ── */
+  bricks.forEach(b=>{
+    if(!b.alive)return;
+    ctx.fillStyle=`rgba(${b.col},.75)`;
+    ctx.shadowColor=`rgba(${b.col},.5)`; ctx.shadowBlur=8;
+    ctx.fillRect(b.x,b.y,b.w,b.h);
+    ctx.strokeStyle=`rgba(${b.col},1)`; ctx.lineWidth=1;
+    ctx.strokeRect(b.x,b.y,b.w,b.h);
+    ctx.shadowBlur=0;
+  });
+
+  /* ── paddle ── */
+  ctx.shadowColor=ACCENT; ctx.shadowBlur=14;
+  ctx.fillStyle=ACCENT; ctx.fillRect(paddle.x,paddle.y,paddle.w,paddle.h);
+  /* brillo interno */
+  ctx.fillStyle='rgba(255,255,255,.35)';
+  ctx.fillRect(paddle.x+4,paddle.y+2,paddle.w-8,paddle.h*.4);
+  ctx.shadowBlur=0;
+
+  /* ── pelota ── */
+  ctx.beginPath(); ctx.arc(ball.x,ball.y,7,0,Math.PI*2);
+  ctx.fillStyle='#ffffff';
+  ctx.shadowColor='#ffffff'; ctx.shadowBlur=18; ctx.fill();
+  ctx.shadowBlur=0;
+
+  /* ── HUD: score + vidas ── */
+  ctx.font='700 20px "Courier New",monospace';
+  ctx.fillStyle=`rgba(${A},.9)`;
+  ctx.textAlign='left'; ctx.fillText(`SCORE  ${gameScore}`,W*.08,H*.065);
+  ctx.textAlign='right';
+  const heartStr='♥'.repeat(gameLives)+'♡'.repeat(3-gameLives);
+  ctx.fillStyle='rgba(255,70,70,.9)'; ctx.fillText(heartStr,W*.92,H*.065);
+
+  /* ── botones de gamepad sobre los dedos ── */
+  if(handsData.length>0) handsData.forEach(hand=>{
+    const lms=hand.landmarks;
+    GAME_BTNS.forEach(btn=>{
+      const lm=lms[btn.lm], r=19;
+      ctx.beginPath(); ctx.arc(lm.sx,lm.sy,r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${btn.col},.20)`; ctx.fill();
+      ctx.strokeStyle=`rgba(${btn.col},1)`; ctx.lineWidth=2;
+      ctx.shadowColor=`rgba(${btn.col},.6)`; ctx.shadowBlur=12; ctx.stroke();
+      ctx.font='700 12px Inter,sans-serif'; ctx.textAlign='center';
+      ctx.fillStyle=`rgba(${btn.col},1)`; ctx.shadowBlur=6;
+      ctx.fillText(btn.label,lm.sx,lm.sy+4);
+      ctx.shadowBlur=0;
     });
   });
 
-  drawWatermark();
+  ctx.restore();
+  drawTagline('los videojuegos los programan ingenieros como vos');
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   MAIN LOOP
-═══════════════════════════════════════════════════════════════ */
-const KEY_LM = [0,4,8,12,16,20];
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 12 — ROBOT ARM
+   Brazo robótico industrial con IK 2D que sigue el movimiento de la mano.
+════════════════════════════════════════════════════════════════════════ */
+let robotTgt={x:0,y:0};
 
+/** Cinemática inversa 2D de 2 segmentos (solución codo-arriba) */
+function solveIK(bx,by,tx,ty,L1,L2){
+  const dx=tx-bx, dy=ty-by;
+  let d=Math.hypot(dx,dy);
+  const max=L1+L2-4;
+  if(d>max){tx=bx+dx/d*max;ty=by+dy/d*max;d=max;}
+  const cosA=Math.max(-1,Math.min(1,(L1*L1+d*d-L2*L2)/(2*L1*d)));
+  const a1=Math.atan2(dy,dx)-Math.acos(cosA);
+  return {ex:bx+L1*Math.cos(a1),ey:by+L1*Math.sin(a1),tx,ty};
+}
+
+/** Dibuja un segmento de brazo como trapecio industrial */
+function armSeg(x1,y1,x2,y2,w1,w2){
+  const ang=Math.atan2(y2-y1,x2-x1)+Math.PI/2;
+  const c=Math.cos(ang),s=Math.sin(ang);
+  ctx.beginPath();
+  ctx.moveTo(x1+c*w1,y1+s*w1); ctx.lineTo(x2+c*w2,y2+s*w2);
+  ctx.lineTo(x2-c*w2,y2-s*w2); ctx.lineTo(x1-c*w1,y1-s*w1);
+  ctx.closePath();
+}
+
+function renderRobotArm(){
+  const L1=H*.29, L2=H*.23;
+  const bx=W/2, by=H-28;
+  /* target: palma o animación demo */
+  let tx,ty;
+  if(handsData.length>0){const pc=palmCenter(handsData[0].landmarks);tx=pc.x;ty=pc.y;}
+  else{tx=W/2+Math.sin(T*.018)*W*.24;ty=H*.38+Math.cos(T*.012)*H*.12;}
+  robotTgt.x+=(tx-robotTgt.x)*.1; robotTgt.y+=(ty-robotTgt.y)*.1;
+  const ik=solveIK(bx,by,robotTgt.x,robotTgt.y,L1,L2);
+
+  ctx.save();
+
+  /* base */
+  ctx.fillStyle='rgba(35,35,35,.95)'; ctx.fillRect(bx-38,by,76,28);
+  ctx.strokeStyle=`rgba(${A},.5)`; ctx.lineWidth=1; ctx.strokeRect(bx-38,by,76,28);
+  ctx.beginPath(); ctx.arc(bx,by,13,0,Math.PI*2);
+  ctx.fillStyle=`rgba(${A},.75)`; ctx.shadowColor=ACCENT; ctx.shadowBlur=8; ctx.fill();
+  ctx.shadowBlur=0;
+
+  /* brazo superior */
+  armSeg(bx,by,ik.ex,ik.ey,14,10);
+  ctx.fillStyle='rgba(52,52,52,.95)'; ctx.fill();
+  ctx.strokeStyle=`rgba(${A},.6)`; ctx.lineWidth=1.2; ctx.stroke();
+  /* nervaduras */
+  const ang1=Math.atan2(ik.ey-by,ik.ex-bx), perp1=ang1+Math.PI/2;
+  for(let i=1;i<=3;i++){
+    const t=i/4,px=bx+Math.cos(ang1)*L1*t,py=by+Math.sin(ang1)*L1*t;
+    ctx.beginPath(); ctx.moveTo(px+Math.cos(perp1)*10,py+Math.sin(perp1)*10);
+    ctx.lineTo(px-Math.cos(perp1)*10,py-Math.sin(perp1)*10);
+    ctx.strokeStyle=`rgba(${A},.3)`; ctx.lineWidth=.7; ctx.stroke();
+  }
+
+  /* codo */
+  ctx.beginPath(); ctx.arc(ik.ex,ik.ey,11,0,Math.PI*2);
+  ctx.fillStyle='rgba(65,65,65,.95)'; ctx.fill();
+  ctx.strokeStyle=`rgba(${A},.85)`; ctx.lineWidth=1.6; ctx.shadowColor=ACCENT; ctx.shadowBlur=8; ctx.stroke();
+  ctx.beginPath(); ctx.arc(ik.ex,ik.ey,4.5,0,Math.PI*2);
+  ctx.fillStyle=`rgba(${A},.9)`; ctx.fill(); ctx.shadowBlur=0;
+
+  /* antebrazo */
+  armSeg(ik.ex,ik.ey,ik.tx,ik.ty,10,7);
+  ctx.fillStyle='rgba(48,48,48,.95)'; ctx.fill();
+  ctx.strokeStyle=`rgba(${A},.6)`; ctx.lineWidth=1.2; ctx.stroke();
+
+  /* efector final (pinza) */
+  const gAng=Math.atan2(ik.ty-ik.ey,ik.tx-ik.ex);
+  [gAng-.38, gAng+.38].forEach(ga=>{
+    ctx.beginPath(); ctx.moveTo(ik.tx,ik.ty);
+    ctx.lineTo(ik.tx+Math.cos(ga)*26,ik.ty+Math.sin(ga)*26);
+    ctx.strokeStyle=`rgba(${A},.9)`; ctx.lineWidth=4.5; ctx.lineCap='round'; ctx.stroke();
+  });
+  ctx.lineCap='butt';
+  ctx.beginPath(); ctx.arc(ik.tx,ik.ty,8,0,Math.PI*2);
+  ctx.fillStyle='rgba(65,65,65,.9)'; ctx.fill();
+  ctx.strokeStyle=ACCENT; ctx.lineWidth=1.5;
+  ctx.shadowColor=ACCENT; ctx.shadowBlur=12; ctx.stroke(); ctx.shadowBlur=0;
+
+  /* HUD de datos */
+  const hx=22, hy=H*.12;
+  ctx.font='400 9px "Courier New",monospace'; ctx.textAlign='left';
+  ctx.fillStyle=`rgba(${A},.72)`;
+  [
+    `X: ${((robotTgt.x-W/2)|0).toString().padStart(6)}px`,
+    `Y: ${((robotTgt.y-H/2)|0).toString().padStart(6)}px`,
+    `Eje1: ${(Math.atan2(ik.ey-by,ik.ex-bx)*180/Math.PI|0)}°`,
+    `Eje2: ${(gAng*180/Math.PI|0)}°`,
+    'STATUS: OPERATIVO',
+  ].forEach((txt,i)=>ctx.fillText(txt,hx,hy+i*14));
+
+  ctx.restore();
+  drawTagline('esto se programa con código en Ingeniería de Sistemas');
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 13 — DNA
+   Hélice de ADN digital que reacciona al movimiento de la mano.
+════════════════════════════════════════════════════════════════════════ */
+let dnaRot=0;
+
+function renderDNA(){
+  const hasHand=landmarks&&landmarks.length>0;
+  dnaRot+=hasHand?.052:.018;
+
+  const cx=W/2, cy=H*.44;
+  const helH=H*.62, radius=Math.min(W*.09,72), rungs=18;
+
+  /* distorsión según proximidad de la mano */
+  let distort=0;
+  if(landmarks){
+    const minD=landmarks.reduce((m,lm)=>Math.min(m,Math.hypot(lm.sx-cx,lm.sy-cy)),Infinity);
+    distort=Math.max(0,1-minD/280)*.55;
+  }
+
+  ctx.save();
+
+  /* dos hebras */
+  for(let strand=0;strand<2;strand++){
+    const phase=strand*Math.PI;
+    ctx.beginPath();
+    for(let i=0;i<=rungs*4;i++){
+      const t=i/(rungs*4);
+      const ang=t*Math.PI*2*(rungs/4)+dnaRot+phase;
+      const y=cy-helH/2+t*helH;
+      const x=cx+Math.cos(ang)*radius*(1+distort*Math.sin(t*Math.PI*4));
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    const col=strand===0?A:'195,225,195';
+    ctx.strokeStyle=`rgba(${col},.78)`; ctx.lineWidth=2.2;
+    ctx.shadowColor=strand===0?ACCENT:'rgba(195,225,195,.7)'; ctx.shadowBlur=10;
+    ctx.stroke();
+  }
+
+  /* eslabones */
+  for(let i=0;i<rungs;i++){
+    const t=i/(rungs-1);
+    const ang=t*Math.PI*2*(rungs/4)+dnaRot;
+    const y=cy-helH/2+t*helH;
+    const x1=cx+Math.cos(ang)*radius*(1+distort*Math.sin(t*Math.PI*4));
+    const x2=cx+Math.cos(ang+Math.PI)*radius*(1+distort*Math.sin(t*Math.PI*4));
+    const bright=.28+.52*((Math.sin(ang*2+T*.04)+1)/2);
+    ctx.beginPath(); ctx.moveTo(x1,y); ctx.lineTo(x2,y);
+    ctx.strokeStyle=`rgba(${A},${bright*.72})`; ctx.lineWidth=1.3; ctx.shadowBlur=3; ctx.stroke();
+    [x1,x2].forEach(rx=>{
+      ctx.beginPath(); ctx.arc(rx,y,2.8,0,Math.PI*2);
+      ctx.fillStyle=`rgba(${A},${bright*.95})`; ctx.shadowBlur=5; ctx.fill();
+    });
+  }
+  ctx.shadowBlur=0;
+
+  /* texto central */
+  ctx.font='700 17px Space Grotesk,sans-serif'; ctx.textAlign='center';
+  ctx.fillStyle='rgba(255,255,255,.88)'; ctx.shadowColor=ACCENT; ctx.shadowBlur=16;
+  ctx.fillText('EL FUTURO ES CÓDIGO', cx, cy+helH/2+42);
+  ctx.shadowBlur=0;
+
+  /* halo de mano */
+  if(hasHand) handsData.forEach(hand=>{
+    const pc=palmCenter(hand.landmarks);
+    if(Math.hypot(pc.x-cx,pc.y-cy)<220){
+      const g=ctx.createRadialGradient(pc.x,pc.y,0,pc.x,pc.y,140);
+      g.addColorStop(0,`rgba(${A},.12)`); g.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.globalCompositeOperation='lighter';
+      ctx.fillStyle=g; ctx.fillRect(pc.x-140,pc.y-140,280,280);
+      ctx.globalCompositeOperation='source-over';
+    }
+  });
+
+  ctx.restore();
+  drawTagline('el código es el ADN del mundo digital');
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   FILTRO 14 — NETWORK
+   Red de nodos que crece desde la mano con etiquetas de tecnologías reales.
+════════════════════════════════════════════════════════════════════════ */
+const NET_LABELS=['SERVER','API','DATABASE','CLOUD','APP','WiFi','IoT','ROUTER',
+                  'PROXY','CACHE','CDN','FIREWALL','VPN','DNS','GATEWAY'];
+let netNodes=[], netT=0;
+
+function spawnNode(x,y){
+  if(netNodes.length>65)return;
+  netNodes.push({
+    x,y,
+    vx:(Math.random()-.5)*1.4, vy:(Math.random()-.5)*1.4,
+    r:3+Math.random()*3.5,
+    label:NET_LABELS[Math.random()*NET_LABELS.length|0],
+    life:1, decay:.003+Math.random()*.003,
+    pulse:Math.random()*Math.PI*2,
+  });
+}
+
+function renderNetwork(){
+  netT++;
+  const hasHand=landmarks&&landmarks.length>0;
+
+  if(hasHand){
+    if(netT%7===0)[0,4,8,12,16,20].forEach(ti=>handsData.forEach(hand=>{
+      const lm=hand.landmarks[ti];
+      if(lm&&Math.random()<.45) spawnNode(lm.sx,lm.sy);
+    }));
+  } else {
+    if(netT%38===0) for(let i=0;i<3;i++)
+      spawnNode(W/2+(Math.random()-.5)*220, H/2+(Math.random()-.5)*200);
+  }
+
+  netNodes.forEach(n=>{n.x+=n.vx;n.y+=n.vy;n.vx*=.99;n.vy*=.99;n.life-=n.decay;n.pulse+=.06;});
+  netNodes=netNodes.filter(n=>n.life>.04);
+
+  ctx.save(); ctx.shadowColor=ACCENT;
+
+  /* conexiones */
+  for(let i=0;i<netNodes.length;i++) for(let j=i+1;j<netNodes.length;j++){
+    const d=Math.hypot(netNodes[i].x-netNodes[j].x,netNodes[i].y-netNodes[j].y);
+    if(d<145){
+      const a=(1-d/145)*Math.min(netNodes[i].life,netNodes[j].life)*.55;
+      ctx.strokeStyle=`rgba(${A},${a})`; ctx.lineWidth=.85; ctx.shadowBlur=2;
+      ctx.beginPath(); ctx.moveTo(netNodes[i].x,netNodes[i].y);
+      ctx.lineTo(netNodes[j].x,netNodes[j].y); ctx.stroke();
+      /* paquete de datos viajando */
+      if(Math.random()<.008){
+        const t=(T*.02)%1;
+        const px=netNodes[i].x+(netNodes[j].x-netNodes[i].x)*t;
+        const py=netNodes[i].y+(netNodes[j].y-netNodes[i].y)*t;
+        ctx.beginPath(); ctx.arc(px,py,2,0,Math.PI*2);
+        ctx.fillStyle='rgba(255,255,255,.85)'; ctx.shadowBlur=7; ctx.fill();
+      }
+    }
+  }
+
+  /* nodos */
+  netNodes.forEach(n=>{
+    const pr=n.r+Math.sin(n.pulse)*1.8;
+    /* anillo exterior */
+    ctx.beginPath(); ctx.arc(n.x,n.y,pr+6,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(${A},${n.life*.18})`; ctx.lineWidth=1; ctx.shadowBlur=5; ctx.stroke();
+    /* punto */
+    ctx.beginPath(); ctx.arc(n.x,n.y,pr,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${A},${n.life*.88})`; ctx.shadowBlur=12; ctx.fill();
+    /* etiqueta */
+    ctx.font='500 8px Inter,sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle=`rgba(255,255,255,${n.life*.75})`; ctx.shadowBlur=0;
+    ctx.fillText(n.label,n.x,n.y-pr-5);
+  });
+
+  ctx.shadowBlur=0;
+  ctx.restore();
+  drawTagline('esto diseñan los ingenieros de sistemas');
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   ESQUELETO GLOBAL (overlay sutil en modos que no tienen el suyo)
+════════════════════════════════════════════════════════════════════════ */
+const NO_SKEL=new Set(['garden','face','twohands','circuit','wireframe','hacker','aiscan','game','robotarm','dna','network']);
+
+function renderSkeleton() {
+  if (!landmarks || NO_SKEL.has(mode)) return;
+  ctx.save();
+  handsData.forEach(hand=>{
+    const lms=hand.landmarks;
+    CONN.forEach(([a,b])=>{
+      ctx.beginPath(); ctx.moveTo(lms[a].sx,lms[a].sy); ctx.lineTo(lms[b].sx,lms[b].sy);
+      ctx.strokeStyle='rgba(255,255,255,.12)'; ctx.lineWidth=1.1; ctx.stroke();
+    });
+    lms.forEach((lm,i)=>{
+      ctx.beginPath(); ctx.arc(lm.sx,lm.sy,[4,8,12,16,20].includes(i)?2.2:1.4,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,255,255,.36)'; ctx.fill();
+    });
+  });
+  ctx.restore();
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   LOOP PRINCIPAL
+════════════════════════════════════════════════════════════════════════ */
 function frame() {
   T++;
 
-  // camera background (mirrored)
+  /* 1. Imagen de cámara (espejada, con filtro seleccionado) */
   ctx.save();
-  ctx.scale(-1,1); ctx.translate(-W,0);
-  ctx.drawImage(vid, 0, 0, W, H);
+  if (camMode !== 'none') {
+    ctx.filter = camMode==='bw'
+      ? 'grayscale(1) brightness(.82)'
+      : 'brightness(.9) contrast(1.06)';
+    ctx.scale(-1,1); ctx.translate(-W,0);
+    ctx.drawImage(vid,0,0,W,H);
+  } else {
+    ctx.fillStyle='#050508'; ctx.fillRect(0,0,W,H);
+  }
   ctx.restore();
 
-  // subtle dark overlay
-  ctx.fillStyle = 'rgba(0,0,10,0.22)';
-  ctx.fillRect(0, 0, W, H);
+  /* 2. Viñeta oscura para contraste de efectos */
+  ctx.fillStyle='rgba(0,0,0,.26)'; ctx.fillRect(0,0,W,H);
 
-  // active mode
-  switch(mode) {
-    case 'particles': renderParticles(); break;
-    case 'garden':    renderGarden();    break;
-    case 'skeleton':  renderSkeleton();  break;
-    case 'mirror':    renderMirror();    break;
-    case 'fire':      renderFire();      break;
-    case 'matrix':    renderMatrix();    break;
-    case 'binary':    renderBinary();    break;
+  /* 3. Filtro activo */
+  switch(mode){
+    case 'particles':  renderParticles(); break;
+    case 'garden':     renderGarden();    break;
+    case 'face':       renderFaceHUD();   break;
+    case 'twohands':   renderTwoHands();  break;
+    case 'binary':     renderBinary();    break;
+    case 'circuit':    renderCircuit();   break;
+    case 'wireframe':  renderWireframe(); break;
+    case 'soundwave':  renderSoundWave(); break;
+    case 'hacker':     renderHacker();    break;
+    case 'aiscan':     renderAIScan();    break;
+    case 'game':       renderGame();      break;
+    case 'robotarm':   renderRobotArm();  break;
+    case 'dna':        renderDNA();       break;
+    case 'network':    renderNetwork();   break;
   }
 
-  // fingertip glow (todos los modos excepto skeleton que ya lo hace)
-  if (landmarks && mode !== 'skeleton') {
-    ctx.globalCompositeOperation = 'lighter';
-    const handsN = Math.floor(landmarks.length/21);
-    for (let h = 0; h < handsN; h++) {
-      KEY_LM.forEach(ki => {
-        const lm = landmarks[h*21+ki];
-        if (!lm) return;
-        const g = ctx.createRadialGradient(lm.sx,lm.sy,0,lm.sx,lm.sy,22);
-        g.addColorStop(0,'rgba(120,205,255,0.28)');
-        g.addColorStop(1,'rgba(0,0,0,0)');
-        ctx.beginPath(); ctx.arc(lm.sx,lm.sy,22,0,6.2832);
-        ctx.fillStyle = g; ctx.fill();
-      });
-    }
-    ctx.globalCompositeOperation = 'source-over';
-  }
+  /* 4. Esqueleto de mano (overlay global) */
+  renderSkeleton();
 
   requestAnimationFrame(frame);
 }
 
-/* ═══════════════════════════════════════════════════════════════
+/* ════════════════════════════════════════════════════════════════════════
    RESIZE
-═══════════════════════════════════════════════════════════════ */
-function onResize() {
-  W = c.width  = window.innerWidth;
-  H = c.height = window.innerHeight;
-  initParticles();
-  initMatrix();
-  initBinary();
-}
-window.addEventListener('resize', onResize);
+════════════════════════════════════════════════════════════════════════ */
+window.addEventListener('resize', () => {
+  W=c.width=window.innerWidth; H=c.height=window.innerHeight;
+  initParticles(); initBinary(); initHacker();
+  gameReady=false;
+});
 
-/* ═══════════════════════════════════════════════════════════════
-   MEDIAPIPE
-═══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════════
+   MEDIAPIPE — HANDS
+════════════════════════════════════════════════════════════════════════ */
 function buildHands() {
-  const mp = new Hands({
-    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-  });
-  mp.setOptions({
-    maxNumHands: 2, modelComplexity: 1,
-    minDetectionConfidence: 0.6, minTrackingConfidence: 0.5
-  });
-  mp.onResults(r => {
-    landmarks = r.multiHandLandmarks?.length
-      ? r.multiHandLandmarks.flat().map(lm => ({
-          ...lm,
-          sx: (1-lm.x)*W,
-          sy: lm.y*H
-        }))
-      : null;
+  const mp=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+  mp.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:.62,minTrackingConfidence:.5});
+  mp.onResults(r=>{
+    if (r.multiHandLandmarks?.length) {
+      handsData=r.multiHandLandmarks.map((lms,i)=>({
+        landmarks:lms.map(lm=>({...lm,sx:(1-lm.x)*W,sy:lm.y*H})),
+        handedness:r.multiHandedness?.[i]?.label||'Unknown',
+      }));
+      landmarks=handsData.flatMap(h=>h.landmarks);
+    } else {
+      handsData=[]; landmarks=null;
+    }
   });
   return mp;
 }
 
+/* ════════════════════════════════════════════════════════════════════════
+   MEDIAPIPE — FACE DETECTION
+════════════════════════════════════════════════════════════════════════ */
+function buildFace() {
+  const fd=new FaceDetection({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${f}`});
+  fd.setOptions({model:'short',minDetectionConfidence:.5});
+  fd.onResults(r=>{ faceData=r.detections||[]; });
+  return fd;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   CÁMARA
+════════════════════════════════════════════════════════════════════════ */
 async function startCam(mp) {
+  const fd=buildFace();
   try {
-    const cam = new Camera(vid, {
-      onFrame: async () => mp.send({image: vid}),
-      width: 640, height: 480
+    const cam=new Camera(vid,{
+      onFrame:async()=>{
+        await mp.send({image:vid});
+        /* Face Detection solo se procesa en el filtro correspondiente */
+        if (mode==='face') await fd.send({image:vid});
+      },
+      width:640, height:480
     });
     await cam.start();
-  } catch(e) {
-    console.warn('Camera:', e.message);
-  }
+  } catch(e) { console.warn('Cam:',e.message); }
   ov.classList.add('gone');
-  setTimeout(() => ov.remove(), 750);
+  setTimeout(()=>ov.remove(), 800);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   UI — BOTONES + TECLADO
-═══════════════════════════════════════════════════════════════ */
-const subbar = document.getElementById('subbar');
-
-function setFlower(i) {
-  flowerIdx = i;
-  document.querySelectorAll('.fbtn').forEach(b =>
-    b.classList.toggle('active', +b.dataset.fi === i)
-  );
-}
-
+/* ════════════════════════════════════════════════════════════════════════
+   UI — BOTONES Y EVENTOS
+════════════════════════════════════════════════════════════════════════ */
 function setMode(id) {
-  mode = id;
-  document.querySelectorAll('.btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.id === id)
-  );
-  subbar.classList.toggle('show', id === 'garden');
+  mode=id;
+  document.querySelectorAll('.btn[data-id]').forEach(b=>b.classList.toggle('active',b.dataset.id===id));
+  sub.classList.toggle('show',id==='garden');
+}
+function setFlower(i) {
+  flowerIdx=i;
+  document.querySelectorAll('.fbtn').forEach(b=>b.classList.toggle('active',+b.dataset.fi===i));
+}
+function setCam(m) {
+  camMode=m;
+  document.querySelectorAll('.cbtn').forEach(b=>b.classList.toggle('active',b.dataset.cam===m));
 }
 
-MODE_LIST.forEach(({id, label}) => {
-  const btn = document.createElement('div');
-  btn.className   = 'btn' + (id === mode ? ' active' : '');
-  btn.dataset.id  = id;
-  btn.textContent = label;
-  btn.onclick     = () => setMode(id);
+/* Construir botones de filtros */
+MODE_LIST.forEach(({id,label})=>{
+  const btn=document.createElement('div');
+  btn.className='btn'+(id===mode?' active':'');
+  btn.dataset.id=id; btn.textContent=label;
+  btn.onclick=()=>setMode(id);
   bar.appendChild(btn);
 });
 
-FLOWER_DEFS.forEach(({label}, i) => {
-  const btn = document.createElement('div');
-  btn.className   = 'btn fbtn' + (i === 0 ? ' active' : '');
-  btn.dataset.fi  = i;
-  btn.textContent = label;
-  btn.onclick     = () => setFlower(i);
-  subbar.appendChild(btn);
+/* Construir botones de flores */
+FLOWER_DEFS.forEach(({label},i)=>{
+  const btn=document.createElement('div');
+  btn.className='btn fbtn'+(i===0?' active':'');
+  btn.dataset.fi=i; btn.textContent=label;
+  btn.onclick=()=>setFlower(i);
+  sub.appendChild(btn);
 });
 
-window.addEventListener('keydown', e => {
-  const k = e.key;
-  const modeIdx = parseInt(k) - 1;
-  if (modeIdx >= 0 && modeIdx < MODE_LIST.length) { setMode(MODE_LIST[modeIdx].id); return; }
-  if (k==='q'||k==='Q') setFlower(0);
-  if (k==='w'||k==='W') setFlower(1);
-  if (k==='e'||k==='E') setFlower(2);
-  if (k==='r'||k==='R') setFlower(3);
+/* Cámara toggle */
+document.querySelectorAll('.cbtn').forEach(b=>b.onclick=()=>setCam(b.dataset.cam));
+
+/* Teclado */
+window.addEventListener('keydown', e=>{
+  const mi=parseInt(e.key)-1;
+  if (mi>=0 && mi<MODE_LIST.length) { setMode(MODE_LIST[mi].id); return; }
+  if (e.key==='q'||e.key==='Q') setFlower(0);
+  if (e.key==='w'||e.key==='W') setFlower(1);
+  if (e.key==='e'||e.key==='E') setFlower(2);
+  if (e.key==='r'||e.key==='R') setFlower(3);
+  if (e.key==='c'||e.key==='C') {
+    const ci=CAM_MODES.indexOf(camMode);
+    setCam(CAM_MODES[(ci+1)%CAM_MODES.length]);
+  }
 });
 
-/* ═══════════════════════════════════════════════════════════════
-   BOOT
-═══════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════════════
+   ARRANQUE
+════════════════════════════════════════════════════════════════════════ */
 initParticles();
-initMatrix();
 initBinary();
+initHacker();
 frame();
 startCam(buildHands());
 </script>
